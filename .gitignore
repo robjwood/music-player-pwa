@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (just in case we use it later)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Browser cache
+.cache/

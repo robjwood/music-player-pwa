@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Player</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="player-container">
+    <!-- Header -->
+    <header class="player-header">
+      <h1>Music Player</h1>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="player-main">
+      <!-- File Selection Area -->
+      <div class="file-selector">
+        <input type="file" id="fileInput" accept="audio/*" multiple aria-label="Select music files">
+        <label for="fileInput" class="file-label">
+          + Add Music Files
+        </label>
+        <div id="fileCount" class="file-count">No files selected</div>
+      </div>
+
+      <!-- Playlist Display -->
+      <div class="playlist-container">
+        <div id="playlist" class="playlist">
+          <div class="playlist-empty">Select files to start playing</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Player Controls (Bottom) -->
+    <footer class="player-footer">
+      <!-- Now Playing Info -->
+      <div class="now-playing">
+        <div id="nowPlayingTitle" class="track-title">No track selected</div>
+        <div id="nowPlayingArtist" class="track-artist">Select a file to start</div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="progress-container">
+        <div id="progressBar" class="progress-bar">
+          <div id="progressFill" class="progress-fill"></div>
+          <input type="range" id="seekBar" class="seek-bar" min="0" max="100" value="0" aria-label="Seek bar">
+        </div>
+        <div class="time-display">
+          <span id="currentTime">0:00</span>
+          <span id="duration">0:00</span>
+        </div>
+      </div>
+
+      <!-- Playback Controls -->
+      <div class="controls">
+        <button id="prevBtn" class="control-btn" aria-label="Previous track">
+          ⏮ Prev
+        </button>
+        <button id="playBtn" class="control-btn control-btn--primary" aria-label="Play/Pause">
+          ▶ Play
+        </button>
+        <button id="nextBtn" class="control-btn" aria-label="Next track">
+          Next ⏭
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Hidden audio element - the actual player -->
+  <audio id="audioElement"></audio>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+
+</html>
