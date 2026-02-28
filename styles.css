@@ -82,6 +82,31 @@ body {
     background-color: #252525;
 }
 
+.clear-btn {
+    background-color: #8b3a3a;
+    border: 1px solid #a84949;
+    color: #e0e0e0;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.clear-btn:hover {
+    background-color: #a84949;
+    border-color: #c85959;
+}
+
+.clear-btn:active {
+    background-color: #743030;
+}
+
+.clear-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .file-count {
     font-size: 0.9rem;
     color: #888;
@@ -125,6 +150,16 @@ body {
 .playlist-item.active {
     background-color: #333;
     border-left-color: #4a9eff;
+    font-weight: 600;
+    box-shadow: 0 0 8px rgba(74, 158, 255, 0.2);
+}
+
+/* Visual indicator (▶) prefix for the now-playing track */
+.playlist-item.active::before {
+    content: '▶ ';
+    color: #4a9eff;
+    font-size: 0.8rem;
+    margin-right: 0.25rem;
 }
 
 .playlist-item-title {
@@ -132,6 +167,11 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.playlist-item.active .playlist-item-title {
+    font-weight: 600;
+    color: #4a9eff;
 }
 
 .playlist-item-filename {

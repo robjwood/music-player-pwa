@@ -62,6 +62,7 @@ const DOM = {
     playBtn: document.getElementById('playBtn'),
     prevBtn: document.getElementById('prevBtn'),
     nextBtn: document.getElementById('nextBtn'),
+    clearBtn: document.getElementById('clearBtn'),
 
     // Audio element (the actual player)
     audio: document.getElementById('audioElement'),
@@ -195,6 +196,74 @@ function renderPlaylist() {
         // Add the item to the playlist
         DOM.playlist.appendChild(item);
     });
+
+    // Scroll the current track into view if it's playing
+    scrollCurrentTrackIntoView();
+
+    // Update the clear button state
+    updateClearButtonState();
+}
+
+/**
+ * Scroll the currently playing track into view
+ * This helps the user see which track is currently playing
+ */
+function scrollCurrentTrackIntoView() {
+    if (playerState.currentIndex < 0 || playerState.currentIndex >= playerState.playlist.length) {
+        return;
+    }
+
+    // Get all playlist items
+    const playlistItems = DOM.playlist.querySelectorAll('.playlist-item');
+
+    // Get the currently playing item
+    const activeItem = playlistItems[playerState.currentIndex];
+
+    if (activeItem) {
+        // Scroll the active item into view
+        // 'nearest' means it will only scroll if the item is out of view
+        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+/**
+ * Clear the entire playlist
+ * This stops playback and removes all tracks
+ */
+function clearPlaylist() {
+    // Ask for confirmation before clearing (to avoid accidental loss)
+    if (playerState.playlist.length === 0) {
+        return;
+    }
+
+    const confirmed = confirm(`Are you sure you want to clear ${playerState.playlist.length} song(s)?`);
+
+    if (!confirmed) {
+        return; // User cancelled
+    }
+
+    // Stop the audio
+    DOM.audio.pause();
+    DOM.audio.src = '';
+
+    // Reset the player state
+    playerState.playlist = [];
+    playerState.currentIndex = -1;
+    playerState.isPlaying = false;
+
+    // Update the UI
+    updateFileCount();
+    renderPlaylist();
+    updateNowPlayingInfo();
+    updatePlayButton();
+    updateProgress();
+}
+
+/**
+ * Enable or disable the clear button based on whether there are songs
+ */
+function updateClearButtonState() {
+    DOM.clearBtn.disabled = playerState.playlist.length === 0;
 }
 
 // ============================================
@@ -373,6 +442,9 @@ function stopSeekDrag() {
 // File selection
 DOM.fileInput.addEventListener('change', handleFileSelection);
 
+// Playlist management
+DOM.clearBtn.addEventListener('click', clearPlaylist);
+
 // Playback controls
 DOM.playBtn.addEventListener('click', togglePlayPause);
 DOM.nextBtn.addEventListener('click', playNextTrack);
@@ -464,4 +536,8 @@ window.addEventListener('DOMContentLoaded', () => {
     renderPlaylist();
     updateNowPlayingInfo();
     updatePlayButton();
+    updateClearButtonState();
+
+    // Set initial volume from the slider value
+    DOM.audio.volume = parseFloat(DOM.volumeSlider.value) / 100;
 });
