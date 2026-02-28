@@ -215,6 +215,67 @@ body {
     color: #888;
 }
 
+/* Volume control */
+.volume-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.volume-label {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.volume-slider {
+    flex: 1;
+    max-width: 150px;
+    height: 6px;
+    border-radius: 3px;
+    background-color: #1a1a1a;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* Styling the slider thumb for different browsers */
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #4a9eff;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    background-color: #5aafff;
+    transform: scale(1.2);
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: #4a9eff;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+    background-color: #5aafff;
+    transform: scale(1.2);
+}
+
+.volume-slider::-moz-range-track {
+    background-color: transparent;
+    border: none;
+}
+
 /* Playback controls */
 .controls {
     display: flex;

@@ -54,15 +54,29 @@
         </div>
       </div>
 
+      <!-- Volume Control -->
+      <div class="volume-container">
+        <label for="volumeSlider" class="volume-label">🔊</label>
+        <input
+          type="range"
+          id="volumeSlider"
+          class="volume-slider"
+          min="0"
+          max="100"
+          value="70"
+          aria-label="Volume control"
+        >
+      </div>
+
       <!-- Playback Controls -->
       <div class="controls">
-        <button id="prevBtn" class="control-btn" aria-label="Previous track">
+        <button id="prevBtn" class="control-btn" aria-label="Previous track (Left Arrow)">
           ⏮ Prev
         </button>
-        <button id="playBtn" class="control-btn control-btn--primary" aria-label="Play/Pause">
+        <button id="playBtn" class="control-btn control-btn--primary" aria-label="Play/Pause (Space)">
           ▶ Play
         </button>
-        <button id="nextBtn" class="control-btn" aria-label="Next track">
+        <button id="nextBtn" class="control-btn" aria-label="Next track (Right Arrow)">
           Next ⏭
         </button>
       </div>

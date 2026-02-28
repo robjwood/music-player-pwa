@@ -55,6 +55,9 @@ const DOM = {
     currentTime: document.getElementById('currentTime'),
     duration: document.getElementById('duration'),
 
+    // Volume control
+    volumeSlider: document.getElementById('volumeSlider'),
+
     // Buttons
     playBtn: document.getElementById('playBtn'),
     prevBtn: document.getElementById('prevBtn'),
@@ -403,6 +406,52 @@ DOM.audio.addEventListener('play', () => {
 DOM.audio.addEventListener('pause', () => {
     playerState.isPlaying = false;
     updatePlayButton();
+});
+
+// Volume control
+// When the user moves the volume slider, update the audio element's volume
+DOM.volumeSlider.addEventListener('input', (event) => {
+    // The slider ranges from 0-100, but audio.volume ranges from 0-1
+    // So we divide by 100 to convert
+    DOM.audio.volume = parseFloat(event.target.value) / 100;
+});
+
+// ============================================
+// KEYBOARD SHORTCUTS
+// ============================================
+
+/**
+ * Handle keyboard events for player control
+ * Space: Play/Pause
+ * Left Arrow: Previous track
+ * Right Arrow: Next track
+ */
+document.addEventListener('keydown', (event) => {
+    // Don't respond to keyboard shortcuts if the user is typing in an input
+    // (e.g., if they're using the search box in Phase 4)
+    if (event.target.tagName === 'INPUT' && event.target.type !== 'range') {
+        return;
+    }
+
+    switch(event.code) {
+        case 'Space':
+            // Prevent the default behavior (scrolling)
+            event.preventDefault();
+            togglePlayPause();
+            break;
+
+        case 'ArrowLeft':
+            // Prevent the default behavior (scrolling)
+            event.preventDefault();
+            playPreviousTrack();
+            break;
+
+        case 'ArrowRight':
+            // Prevent the default behavior (scrolling)
+            event.preventDefault();
+            playNextTrack();
+            break;
+    }
 });
 
 // ============================================
