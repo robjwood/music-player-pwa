@@ -57,27 +57,16 @@ function getFilenameStem(file) {
 // ============================================
 
 /**
- * Handle when the user selects files
+ * Handle when the user selects files from a folder
  */
 function handleFilesSelected(event) {
     const audioFiles = event.detail.files;
-    const fromFolder = event.detail.fromFolder || false;
     const wasEmpty = playerState.playlist.length === 0;
 
-    // Track origin: only a clean single-folder load is persisted
-    if (fromFolder && wasEmpty) {
+    // Mark as folder-loaded (all selections are from folders now)
+    if (wasEmpty) {
         playerState.fromFolder = true;
         saveLastTrackIndex(0);
-    } else if (playerState.fromFolder && !fromFolder) {
-        // Individual files added on top of folder load → mixed playlist
-        playerState.fromFolder = false;
-        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
-        localStorage.removeItem('music-player-last-index');
-    } else if (fromFolder && playerState.fromFolder && wasEmpty === false) {
-        // Second folder mixed in → clear persistence
-        playerState.fromFolder = false;
-        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
-        localStorage.removeItem('music-player-last-index');
     }
 
     // Add the new files to our playlist
@@ -112,9 +101,6 @@ function handleClearPlaylist() {
 
     // Update the UI
     updateAllComponents();
-
-    // Reset file input
-    DOM.fileSelector.setCleared();
 }
 
 // ============================================

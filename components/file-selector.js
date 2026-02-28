@@ -1,19 +1,18 @@
 /**
  * FILE SELECTOR COMPONENT
  *
- * File input for selecting audio files, folder picker for selecting entire folders,
- * and clear button for the playlist
+ * Folder picker for selecting entire directories of music files
  *
  * Usage:
  *   <file-selector></file-selector>
  *
  * Events emitted:
- *   - files-selected: { detail: { files: File[] } }
+ *   - files-selected: { detail: { files: File[], fromFolder: true } }
  *   - clear-playlist: {}
  *
  * Methods:
  *   updateFileCount(count) - Update the count display
- *   setCleared() - Reset the file input
+ *   showRestoreBanner(folderName, onRestore) - Show a restore banner for auto-resume
  */
 
 // Audio file extensions supported for directory scanning
@@ -28,16 +27,23 @@ function isAudioFile(filename) {
 
 /**
  * Recursively scan a directory and collect all audio files
+ * @param {FileSystemDirectoryHandle} dirHandle - Directory to scan
+ * @param {Array} audioFiles - Accumulator for audio files
+ * @param {Function} onProgress - Optional callback(count) called as files are found
  */
-async function scanDirectory(dirHandle, audioFiles = []) {
+async function scanDirectory(dirHandle, audioFiles = [], onProgress = null) {
     for await (const entry of dirHandle.values()) {
         if (entry.kind === 'directory') {
             // Recurse into subdirectories
-            await scanDirectory(entry, audioFiles);
+            await scanDirectory(entry, audioFiles, onProgress);
         } else if (entry.kind === 'file' && isAudioFile(entry.name)) {
             // Get File object from FileSystemFileHandle
             const file = await entry.getFile();
             audioFiles.push(file);
+            // Call progress callback if provided
+            if (onProgress) {
+                onProgress(audioFiles.length);
+            }
         }
     }
     return audioFiles;
@@ -59,8 +65,6 @@ class FileSelector extends HTMLElement {
      * Render the component's HTML and styles
      */
     render() {
-        const hasFolderApi = 'showDirectoryPicker' in window;
-
         this.shadowRoot.innerHTML = `
             <style>
                 :host {
@@ -75,11 +79,7 @@ class FileSelector extends HTMLElement {
                     gap: 1rem;
                 }
 
-                input[type="file"] {
-                    display: none;
-                }
-
-                .add-btn,
+                .folder-btn,
                 .clear-btn {
                     background-color: #2a2a2a;
                     border: 1px solid #444;
@@ -93,16 +93,16 @@ class FileSelector extends HTMLElement {
                     font-family: inherit;
                 }
 
-                .add-btn:hover {
+                .folder-btn:hover {
                     background-color: #333;
                     border-color: #555;
                 }
 
-                .add-btn:active {
+                .folder-btn:active {
                     background-color: #252525;
                 }
 
-                .add-btn:disabled {
+                .folder-btn:disabled {
                     opacity: 0.6;
                     cursor: not-allowed;
                 }
@@ -131,117 +131,17 @@ class FileSelector extends HTMLElement {
                     font-size: 0.9rem;
                     color: #888;
                 }
-
-                /* Modal dialog */
-                .modal {
-                    display: none;
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0, 0, 0, 0.7);
-                    z-index: 1000;
-                    align-items: center;
-                    justify-content: center;
-                }
-
-                .modal.active {
-                    display: flex;
-                }
-
-                .modal-content {
-                    background: #1a1a1a;
-                    border: 1px solid #444;
-                    border-radius: 8px;
-                    padding: 2rem;
-                    min-width: 300px;
-                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-                }
-
-                .modal-title {
-                    margin: 0 0 1.5rem 0;
-                    font-size: 1.2rem;
-                    color: #e0e0e0;
-                }
-
-                .modal-buttons {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 1rem;
-                }
-
-                .modal-btn {
-                    background-color: #2a2a2a;
-                    border: 1px solid #444;
-                    color: #e0e0e0;
-                    padding: 0.75rem 1rem;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    font-size: 1rem;
-                    font-family: inherit;
-                    text-align: left;
-                }
-
-                .modal-btn:hover {
-                    background-color: #333;
-                    border-color: #555;
-                }
-
-                .modal-btn:active {
-                    background-color: #252525;
-                }
-
-                .modal-close {
-                    background: transparent;
-                    border: none;
-                    color: #888;
-                    font-size: 1.5rem;
-                    cursor: pointer;
-                    position: absolute;
-                    top: 1rem;
-                    right: 1rem;
-                }
-
-                .modal-close:hover {
-                    color: #aaa;
-                }
             </style>
 
             <div class="file-selector">
-                <input
-                    type="file"
-                    class="file-input"
-                    accept="audio/*"
-                    multiple
-                    aria-label="Select music files"
-                >
-                <button class="add-btn" aria-label="Add music files or folder">
-                    + Add Music
+                <button class="folder-btn" aria-label="Select folder">
+                    📁 Select Folder
                 </button>
                 <button class="clear-btn" aria-label="Clear playlist">
                     ✕ Clear
                 </button>
                 <div class="file-count">No files selected</div>
             </div>
-
-            ${hasFolderApi ? `
-                <div class="modal">
-                    <div class="modal-content">
-                        <button class="modal-close">✕</button>
-                        <h2 class="modal-title">Add Music</h2>
-                        <div class="modal-buttons">
-                            <button class="modal-btn add-files-modal">
-                                📄 Add Individual Files
-                            </button>
-                            <button class="modal-btn add-folder-modal">
-                                📁 Add Folder
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            ` : ''}
         `;
     }
 
@@ -249,80 +149,12 @@ class FileSelector extends HTMLElement {
      * Set up event listeners
      */
     setupEventListeners() {
-        const fileInput = this.shadowRoot.querySelector('.file-input');
-        const addBtn = this.shadowRoot.querySelector('.add-btn');
+        const folderBtn = this.shadowRoot.querySelector('.folder-btn');
         const clearBtn = this.shadowRoot.querySelector('.clear-btn');
-        const modal = this.shadowRoot.querySelector('.modal');
-        const addFilesModal = this.shadowRoot.querySelector('.add-files-modal');
-        const addFolderModal = this.shadowRoot.querySelector('.add-folder-modal');
-        const modalClose = this.shadowRoot.querySelector('.modal-close');
 
-        // Open modal when add button is clicked
-        addBtn.addEventListener('click', () => {
-            if (modal) {
-                modal.classList.add('active');
-            } else {
-                // Fallback if folder API not supported
-                fileInput.click();
-            }
-        });
-
-        // Close modal
-        const closeModal = () => {
-            if (modal) {
-                modal.classList.remove('active');
-            }
-        };
-
-        if (modal) {
-            if (modalClose) {
-                modalClose.addEventListener('click', closeModal);
-            }
-
-            // Close modal when clicking outside
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    closeModal();
-                }
-            });
-        }
-
-        // Add files option
-        if (addFilesModal) {
-            addFilesModal.addEventListener('click', () => {
-                closeModal();
-                fileInput.click();
-            });
-        }
-
-        // Add folder option
-        if (addFolderModal) {
-            addFolderModal.addEventListener('click', () => {
-                closeModal();
-                this.handleFolderSelection();
-            });
-        }
-
-        // When files are selected via file input
-        fileInput.addEventListener('change', (event) => {
-            const files = event.target.files;
-
-            // Filter for audio files only
-            const audioFiles = Array.from(files).filter(file =>
-                file.type.startsWith('audio/')
-            );
-
-            if (audioFiles.length === 0) {
-                alert('No audio files selected. Please select .mp3, .wav, .ogg, etc.');
-                return;
-            }
-
-            // Emit custom event
-            this.dispatchEvent(new CustomEvent('files-selected', {
-                detail: { files: audioFiles },
-                bubbles: true,
-                composed: true,
-            }));
+        // Folder picker button
+        folderBtn.addEventListener('click', () => {
+            this.handleFolderSelection();
         });
 
         // Clear button
@@ -343,43 +175,33 @@ class FileSelector extends HTMLElement {
     async handleFolderSelection() {
         const fileCountEl = this.shadowRoot.querySelector('.file-count');
         const originalText = fileCountEl.textContent;
+        const startTime = Date.now();
+        let lastUpdateTime = startTime;
 
         try {
             // Show "Scanning..." text
             this.isScanning = true;
-            fileCountEl.textContent = 'Scanning…';
+            fileCountEl.textContent = 'Scanning… (0 files)';
 
-            // Try to retrieve and reuse the stored folder handle
-            let dirHandle = null;
-            try {
-                dirHandle = await MusicPlayerDB.getFolderHandle();
-                if (dirHandle) {
-                    // Check if we still have permission
-                    const permission = await dirHandle.queryPermission({ mode: 'read' });
-                    if (permission !== 'granted') {
-                        // Permission was revoked, need to ask again
-                        try {
-                            const result = await dirHandle.requestPermission({ mode: 'read' });
-                            if (result !== 'granted') {
-                                dirHandle = null;  // Fall back to picker
-                            }
-                        } catch (err) {
-                            dirHandle = null;  // Fall back to picker
-                        }
-                    }
+            // Open folder picker
+            const dirHandle = await window.showDirectoryPicker();
+
+            // Progress callback to update UI as files are found
+            const onProgress = (count) => {
+                const now = Date.now();
+                const elapsedSeconds = (now - startTime) / 1000;
+                const filesPerSecond = count / elapsedSeconds;
+
+                // Update display every 200ms to avoid too many updates
+                if (now - lastUpdateTime > 200) {
+                    const speed = filesPerSecond.toFixed(1);
+                    fileCountEl.textContent = `Scanning… (${count} file${count !== 1 ? 's' : ''}, ${speed} files/sec)`;
+                    lastUpdateTime = now;
                 }
-            } catch (err) {
-                console.warn('Failed to retrieve folder handle:', err);
-                dirHandle = null;
-            }
+            };
 
-            // If no valid stored handle, open the folder picker
-            if (!dirHandle) {
-                dirHandle = await window.showDirectoryPicker();
-            }
-
-            // Recursively scan for audio files
-            const audioFiles = await scanDirectory(dirHandle);
+            // Recursively scan for audio files with progress tracking
+            const audioFiles = await scanDirectory(dirHandle, [], onProgress);
 
             if (audioFiles.length === 0) {
                 alert('No audio files found in the selected folder or its subfolders.');
@@ -430,14 +252,6 @@ class FileSelector extends HTMLElement {
 
         // Disable clear button if no files
         clearBtn.disabled = count === 0;
-    }
-
-    /**
-     * Reset the file input (after clearing)
-     */
-    setCleared() {
-        const fileInput = this.shadowRoot.querySelector('.file-input');
-        fileInput.value = '';
     }
 
     /**
