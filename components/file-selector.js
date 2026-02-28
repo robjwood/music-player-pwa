@@ -79,8 +79,8 @@ class FileSelector extends HTMLElement {
                     display: none;
                 }
 
-                .file-label,
-                .folder-btn {
+                .add-btn,
+                .clear-btn {
                     background-color: #2a2a2a;
                     border: 1px solid #444;
                     color: #e0e0e0;
@@ -93,18 +93,16 @@ class FileSelector extends HTMLElement {
                     font-family: inherit;
                 }
 
-                .file-label:hover,
-                .folder-btn:hover {
+                .add-btn:hover {
                     background-color: #333;
                     border-color: #555;
                 }
 
-                .file-label:active,
-                .folder-btn:active {
+                .add-btn:active {
                     background-color: #252525;
                 }
 
-                .folder-btn:disabled {
+                .add-btn:disabled {
                     opacity: 0.6;
                     cursor: not-allowed;
                 }
@@ -112,11 +110,6 @@ class FileSelector extends HTMLElement {
                 .clear-btn {
                     background-color: #8b3a3a;
                     border: 1px solid #a84949;
-                    color: #e0e0e0;
-                    padding: 0.5rem 1rem;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    transition: all 0.2s;
                     font-size: 0.9rem;
                 }
 
@@ -139,8 +132,80 @@ class FileSelector extends HTMLElement {
                     color: #888;
                 }
 
-                .folder-btn.hidden {
+                /* Modal dialog */
+                .modal {
                     display: none;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.7);
+                    z-index: 1000;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .modal.active {
+                    display: flex;
+                }
+
+                .modal-content {
+                    background: #1a1a1a;
+                    border: 1px solid #444;
+                    border-radius: 8px;
+                    padding: 2rem;
+                    min-width: 300px;
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+                }
+
+                .modal-title {
+                    margin: 0 0 1.5rem 0;
+                    font-size: 1.2rem;
+                    color: #e0e0e0;
+                }
+
+                .modal-buttons {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                }
+
+                .modal-btn {
+                    background-color: #2a2a2a;
+                    border: 1px solid #444;
+                    color: #e0e0e0;
+                    padding: 0.75rem 1rem;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-size: 1rem;
+                    font-family: inherit;
+                    text-align: left;
+                }
+
+                .modal-btn:hover {
+                    background-color: #333;
+                    border-color: #555;
+                }
+
+                .modal-btn:active {
+                    background-color: #252525;
+                }
+
+                .modal-close {
+                    background: transparent;
+                    border: none;
+                    color: #888;
+                    font-size: 1.5rem;
+                    cursor: pointer;
+                    position: absolute;
+                    top: 1rem;
+                    right: 1rem;
+                }
+
+                .modal-close:hover {
+                    color: #aaa;
                 }
             </style>
 
@@ -152,15 +217,31 @@ class FileSelector extends HTMLElement {
                     multiple
                     aria-label="Select music files"
                 >
-                <label for="file-input" class="file-label">
-                    + Add Music Files
-                </label>
-                ${hasFolderApi ? '<button class="folder-btn" aria-label="Select folder">📁 Select Folder</button>' : ''}
+                <button class="add-btn" aria-label="Add music files or folder">
+                    + Add Music
+                </button>
                 <button class="clear-btn" aria-label="Clear playlist">
                     ✕ Clear
                 </button>
                 <div class="file-count">No files selected</div>
             </div>
+
+            ${hasFolderApi ? `
+                <div class="modal">
+                    <div class="modal-content">
+                        <button class="modal-close">✕</button>
+                        <h2 class="modal-title">Add Music</h2>
+                        <div class="modal-buttons">
+                            <button class="modal-btn add-files-modal">
+                                📄 Add Individual Files
+                            </button>
+                            <button class="modal-btn add-folder-modal">
+                                📁 Add Folder
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ` : ''}
         `;
     }
 
@@ -169,14 +250,58 @@ class FileSelector extends HTMLElement {
      */
     setupEventListeners() {
         const fileInput = this.shadowRoot.querySelector('.file-input');
-        const fileLabel = this.shadowRoot.querySelector('.file-label');
-        const folderBtn = this.shadowRoot.querySelector('.folder-btn');
+        const addBtn = this.shadowRoot.querySelector('.add-btn');
         const clearBtn = this.shadowRoot.querySelector('.clear-btn');
+        const modal = this.shadowRoot.querySelector('.modal');
+        const addFilesModal = this.shadowRoot.querySelector('.add-files-modal');
+        const addFolderModal = this.shadowRoot.querySelector('.add-folder-modal');
+        const modalClose = this.shadowRoot.querySelector('.modal-close');
 
-        // Connect the label to the file input
-        fileLabel.addEventListener('click', () => {
-            fileInput.click();
+        // Open modal when add button is clicked
+        addBtn.addEventListener('click', () => {
+            if (modal) {
+                modal.classList.add('active');
+            } else {
+                // Fallback if folder API not supported
+                fileInput.click();
+            }
         });
+
+        // Close modal
+        const closeModal = () => {
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        };
+
+        if (modal) {
+            if (modalClose) {
+                modalClose.addEventListener('click', closeModal);
+            }
+
+            // Close modal when clicking outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+        }
+
+        // Add files option
+        if (addFilesModal) {
+            addFilesModal.addEventListener('click', () => {
+                closeModal();
+                fileInput.click();
+            });
+        }
+
+        // Add folder option
+        if (addFolderModal) {
+            addFolderModal.addEventListener('click', () => {
+                closeModal();
+                this.handleFolderSelection();
+            });
+        }
 
         // When files are selected via file input
         fileInput.addEventListener('change', (event) => {
@@ -200,13 +325,6 @@ class FileSelector extends HTMLElement {
             }));
         });
 
-        // Folder picker button (only if supported)
-        if (folderBtn) {
-            folderBtn.addEventListener('click', () => {
-                this.handleFolderSelection();
-            });
-        }
-
         // Clear button
         clearBtn.addEventListener('click', () => {
             // Ask for confirmation
@@ -223,18 +341,42 @@ class FileSelector extends HTMLElement {
      * Handle folder selection via File System Access API
      */
     async handleFolderSelection() {
-        const folderBtn = this.shadowRoot.querySelector('.folder-btn');
         const fileCountEl = this.shadowRoot.querySelector('.file-count');
         const originalText = fileCountEl.textContent;
 
         try {
             // Show "Scanning..." text
             this.isScanning = true;
-            if (folderBtn) folderBtn.disabled = true;
             fileCountEl.textContent = 'Scanning…';
 
-            // Open folder picker
-            const dirHandle = await window.showDirectoryPicker();
+            // Try to retrieve and reuse the stored folder handle
+            let dirHandle = null;
+            try {
+                dirHandle = await MusicPlayerDB.getFolderHandle();
+                if (dirHandle) {
+                    // Check if we still have permission
+                    const permission = await dirHandle.queryPermission({ mode: 'read' });
+                    if (permission !== 'granted') {
+                        // Permission was revoked, need to ask again
+                        try {
+                            const result = await dirHandle.requestPermission({ mode: 'read' });
+                            if (result !== 'granted') {
+                                dirHandle = null;  // Fall back to picker
+                            }
+                        } catch (err) {
+                            dirHandle = null;  // Fall back to picker
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to retrieve folder handle:', err);
+                dirHandle = null;
+            }
+
+            // If no valid stored handle, open the folder picker
+            if (!dirHandle) {
+                dirHandle = await window.showDirectoryPicker();
+            }
 
             // Recursively scan for audio files
             const audioFiles = await scanDirectory(dirHandle);
@@ -242,12 +384,17 @@ class FileSelector extends HTMLElement {
             if (audioFiles.length === 0) {
                 alert('No audio files found in the selected folder or its subfolders.');
                 fileCountEl.textContent = originalText;
+                // Clear stored handle if scan yielded nothing
+                MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
                 return;
             }
 
-            // Emit custom event with found files
+            // Save the folder handle for later restoration
+            MusicPlayerDB.saveFolderHandle(dirHandle).catch(err => console.warn('Failed to save folder handle:', err));
+
+            // Emit custom event with found files, tagged as from folder
             this.dispatchEvent(new CustomEvent('files-selected', {
-                detail: { files: audioFiles },
+                detail: { files: audioFiles, fromFolder: true },
                 bubbles: true,
                 composed: true,
             }));
@@ -262,7 +409,6 @@ class FileSelector extends HTMLElement {
             fileCountEl.textContent = originalText;
         } finally {
             this.isScanning = false;
-            if (folderBtn) folderBtn.disabled = false;
         }
     }
 
@@ -292,6 +438,106 @@ class FileSelector extends HTMLElement {
     setCleared() {
         const fileInput = this.shadowRoot.querySelector('.file-input');
         fileInput.value = '';
+    }
+
+    /**
+     * Show a dismissible restore banner
+     * @param {string} folderName - Name of the folder to restore
+     * @param {Function} onRestore - Callback when user clicks "Restore"
+     */
+    showRestoreBanner(folderName, onRestore) {
+        const container = this.shadowRoot.querySelector('.file-selector');
+
+        // Create banner element
+        const banner = document.createElement('div');
+        banner.className = 'restore-banner';
+        banner.innerHTML = `
+            📁 Restore last folder: <strong>${this.escapeHtml(folderName)}</strong>
+            <button class="restore-btn">Restore</button>
+            <button class="dismiss-btn">✕</button>
+        `;
+
+        // Add banner styles if not already in CSS
+        const style = this.shadowRoot.querySelector('style');
+        if (style && !style.textContent.includes('.restore-banner')) {
+            style.textContent += `
+                .restore-banner {
+                    margin-bottom: 1rem;
+                    padding: 0.75rem 1rem;
+                    background-color: #2a3a2a;
+                    border: 1px solid #4a7a4a;
+                    border-radius: 4px;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    color: #d0e0d0;
+                    font-size: 0.95rem;
+                }
+
+                .restore-banner strong {
+                    color: #a0d0a0;
+                }
+
+                .restore-banner .restore-btn,
+                .restore-banner .dismiss-btn {
+                    background-color: #3a5a3a;
+                    border: 1px solid #5a8a5a;
+                    color: #d0e0d0;
+                    padding: 0.4rem 0.8rem;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-size: 0.85rem;
+                }
+
+                .restore-banner .restore-btn:hover {
+                    background-color: #4a7a4a;
+                    border-color: #7aaa7a;
+                }
+
+                .restore-banner .dismiss-btn {
+                    margin-left: auto;
+                    background-color: transparent;
+                    border: none;
+                    color: #888;
+                    padding: 0.2rem 0.4rem;
+                }
+
+                .restore-banner .dismiss-btn:hover {
+                    color: #aaa;
+                }
+            `;
+        }
+
+        // Insert banner at the top
+        container.insertBefore(banner, container.firstChild);
+
+        // Handle restore click
+        const restoreBtn = banner.querySelector('.restore-btn');
+        restoreBtn.addEventListener('click', async () => {
+            banner.remove();
+            await onRestore();
+        });
+
+        // Handle dismiss click
+        const dismissBtn = banner.querySelector('.dismiss-btn');
+        dismissBtn.addEventListener('click', () => {
+            banner.remove();
+        });
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
     }
 }
 

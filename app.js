@@ -22,6 +22,7 @@ const playerState = {
     playlist: [],           // Array of File objects
     currentIndex: -1,       // Index of the currently selected track (-1 = none)
     isPlaying: false,       // Are we currently playing?
+    fromFolder: false,      // Was the playlist loaded from a folder pick?
 };
 
 // ============================================
@@ -60,6 +61,24 @@ function getFilenameStem(file) {
  */
 function handleFilesSelected(event) {
     const audioFiles = event.detail.files;
+    const fromFolder = event.detail.fromFolder || false;
+    const wasEmpty = playerState.playlist.length === 0;
+
+    // Track origin: only a clean single-folder load is persisted
+    if (fromFolder && wasEmpty) {
+        playerState.fromFolder = true;
+        saveLastTrackIndex(0);
+    } else if (playerState.fromFolder && !fromFolder) {
+        // Individual files added on top of folder load → mixed playlist
+        playerState.fromFolder = false;
+        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+        localStorage.removeItem('music-player-last-index');
+    } else if (fromFolder && playerState.fromFolder && wasEmpty === false) {
+        // Second folder mixed in → clear persistence
+        playerState.fromFolder = false;
+        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+        localStorage.removeItem('music-player-last-index');
+    }
 
     // Add the new files to our playlist
     playerState.playlist.push(...audioFiles);
@@ -85,6 +104,11 @@ function handleClearPlaylist() {
     playerState.playlist = [];
     playerState.currentIndex = -1;
     playerState.isPlaying = false;
+    playerState.fromFolder = false;
+
+    // Clear persistence (but not volume preference)
+    MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+    localStorage.removeItem('music-player-last-index');
 
     // Update the UI
     updateAllComponents();
@@ -112,6 +136,11 @@ function loadAndPlayTrack() {
     // Check if we have a valid track
     if (playerState.currentIndex < 0 || playerState.currentIndex >= playerState.playlist.length) {
         return;
+    }
+
+    // Save the current index for folder playlists
+    if (playerState.fromFolder) {
+        saveLastTrackIndex(playerState.currentIndex);
     }
 
     const currentFile = playerState.playlist[playerState.currentIndex];
@@ -185,6 +214,8 @@ function handleVolumeChanged(event) {
     const volume = event.detail.volume;
     // Convert 0-100 to 0-1
     DOM.audio.volume = volume / 100;
+    // Save volume preference
+    localStorage.setItem('music-player-volume', String(volume));
 }
 
 /**
@@ -319,12 +350,126 @@ DOM.audio.addEventListener('pause', onPlayPauseChange);
 DOM.audio.addEventListener('loadedmetadata', onTimeUpdate);
 
 // ============================================
+// PERSISTENCE HELPERS
+// ============================================
+
+/**
+ * Save the current track index to localStorage
+ */
+function saveLastTrackIndex(index) {
+    if (playerState.fromFolder) {
+        localStorage.setItem('music-player-last-index', String(index));
+    }
+}
+
+/**
+ * Restore volume from localStorage
+ */
+function restoreVolume() {
+    const savedVolume = localStorage.getItem('music-player-volume');
+    if (savedVolume !== null) {
+        const vol = parseFloat(savedVolume);
+        if (!isNaN(vol) && vol >= 0 && vol <= 100) {
+            DOM.volumeControl.setVolume(vol);
+            DOM.audio.volume = vol / 100;
+        }
+    }
+}
+
+/**
+ * Attempt to restore the folder and playlist on startup
+ */
+async function attemptFolderRestore() {
+    // Check if File System Access API is supported
+    if (!('showDirectoryPicker' in window)) {
+        return;
+    }
+
+    // Try to retrieve the stored folder handle
+    let handle;
+    try {
+        handle = await MusicPlayerDB.getFolderHandle();
+    } catch (err) {
+        console.warn('Failed to retrieve folder handle from IndexedDB:', err);
+        return;
+    }
+
+    if (!handle) {
+        return;
+    }
+
+    // Check permission status
+    try {
+        const permission = await handle.queryPermission({ mode: 'read' });
+
+        if (permission === 'granted') {
+            // Permission already granted, restore silently
+            await restoreFolderFromHandle(handle);
+        } else if (permission === 'prompt') {
+            // Permission needs to be re-granted, show banner
+            DOM.fileSelector.showRestoreBanner(handle.name, async () => {
+                try {
+                    const result = await handle.requestPermission({ mode: 'read' });
+                    if (result === 'granted') {
+                        await restoreFolderFromHandle(handle);
+                        updateAllComponents();
+                    } else {
+                        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+                    }
+                } catch (err) {
+                    console.warn('Failed to request permission:', err);
+                    MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+                }
+            });
+        } else {
+            // Permission denied, clear stored handle
+            MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+        }
+    } catch (err) {
+        console.warn('Failed to check permission or restore folder:', err);
+        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+    }
+}
+
+/**
+ * Restore playlist from a FileSystemDirectoryHandle
+ */
+async function restoreFolderFromHandle(handle) {
+    try {
+        const audioFiles = await scanDirectory(handle);
+
+        if (audioFiles.length === 0) {
+            MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+            return;
+        }
+
+        playerState.playlist = audioFiles;
+        playerState.fromFolder = true;
+
+        // Restore the last track index
+        const savedIndex = localStorage.getItem('music-player-last-index');
+        if (savedIndex !== null) {
+            const index = parseInt(savedIndex, 10);
+            if (!isNaN(index) && index >= 0 && index < audioFiles.length) {
+                playerState.currentIndex = index;
+            }
+        }
+    } catch (err) {
+        console.warn('Failed to restore folder from handle:', err);
+        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+    }
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
-window.addEventListener('DOMContentLoaded', () => {
-    // Set initial volume
-    DOM.audio.volume = DOM.volumeControl.getVolume() / 100;
+window.addEventListener('DOMContentLoaded', async () => {
+    // Restore volume preference
+    restoreVolume();
+
+    // Attempt to restore folder and playlist
+    await attemptFolderRestore();
 
     // Initialize UI
     updateAllComponents();
