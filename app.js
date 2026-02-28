@@ -1,71 +1,41 @@
-/* ============================================
-   MUSIC PLAYER - PHASE 1 MVP
-   Simple, vanilla JavaScript audio player
-   ============================================
-
-   OVERVIEW:
-   This app manages a simple music player with:
-   - File selection (manual upload)
-   - Playlist display
-   - Play/pause controls
-   - Next/previous navigation
-   - Progress bar with seeking
-   - Time display
-
-   ARCHITECTURE:
-   - Playlist: Array of File objects
-   - Current Track: Index into the playlist
-   - Audio Element: Native HTML5 <audio> for playback
-   - UI State: Automatically updates based on playback state
-*/
+/**
+ * MUSIC PLAYER - MAIN APPLICATION LOGIC
+ *
+ * This file manages:
+ * - Central state (playlist, current track, playback state)
+ * - Audio playback (via the HTML5 audio element)
+ * - Communication between components via custom events
+ *
+ * Architecture:
+ * - Components handle their own UI and user interactions
+ * - Components emit custom events when the user interacts
+ * - App listens to events and updates the central state
+ * - App updates components by calling their methods
+ */
 
 // ============================================
 // STATE MANAGEMENT
 // ============================================
 
 // This object holds all the state for our player
-// Think of it like a "database" for our app
 const playerState = {
-    playlist: [],          // Array of File objects
-    currentIndex: -1,      // Index of the currently selected track (-1 = none)
-    isPlaying: false,      // Are we currently playing?
+    playlist: [],           // Array of File objects
+    currentIndex: -1,       // Index of the currently selected track (-1 = none)
+    isPlaying: false,       // Are we currently playing?
 };
 
 // ============================================
-// DOM REFERENCES
+// DOM & COMPONENT REFERENCES
 // ============================================
 
-// Cache DOM elements so we don't have to query them repeatedly
-// This is more efficient than using querySelector every time
 const DOM = {
-    // File input
-    fileInput: document.getElementById('fileInput'),
-    fileCount: document.getElementById('fileCount'),
-
-    // Playlist
-    playlist: document.getElementById('playlist'),
-
-    // Now playing info
-    nowPlayingTitle: document.getElementById('nowPlayingTitle'),
-    nowPlayingArtist: document.getElementById('nowPlayingArtist'),
-
-    // Progress bar and time
-    progressFill: document.getElementById('progressFill'),
-    seekBar: document.getElementById('seekBar'),
-    currentTime: document.getElementById('currentTime'),
-    duration: document.getElementById('duration'),
-
-    // Volume control
-    volumeSlider: document.getElementById('volumeSlider'),
-
-    // Buttons
-    playBtn: document.getElementById('playBtn'),
-    prevBtn: document.getElementById('prevBtn'),
-    nextBtn: document.getElementById('nextBtn'),
-    clearBtn: document.getElementById('clearBtn'),
-
-    // Audio element (the actual player)
     audio: document.getElementById('audioElement'),
+    fileSelector: document.querySelector('file-selector'),
+    playlistView: document.querySelector('playlist-view'),
+    playerControls: document.querySelector('player-controls'),
+    volumeControl: document.querySelector('volume-control'),
+    progressBar: document.querySelector('progress-bar'),
+    nowPlayingInfo: document.querySelector('now-playing-info'),
 };
 
 // ============================================
@@ -73,31 +43,11 @@ const DOM = {
 // ============================================
 
 /**
- * Format seconds into a readable time string
- * e.g., 204 seconds -> "3:24"
- */
-function formatTime(seconds) {
-    // Handle invalid inputs
-    if (!isFinite(seconds) || seconds < 0) {
-        return '0:00';
-    }
-
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-
-    // Pad seconds with a leading zero if needed
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
-
-/**
  * Extract a friendly name from a file
  * e.g., "/path/to/song.mp3" -> "song"
  */
 function getFilenameStem(file) {
-    // Get just the filename without the path
     const nameWithExtension = file.name;
-
-    // Remove the file extension
     return nameWithExtension.replace(/\.[^/.]+$/, '');
 }
 
@@ -107,21 +57,9 @@ function getFilenameStem(file) {
 
 /**
  * Handle when the user selects files
- * This is called when they click the file input
  */
-function handleFileSelection(event) {
-    // Get the array of selected File objects
-    const selectedFiles = Array.from(event.target.files);
-
-    // Only accept audio files (filter out anything else)
-    const audioFiles = selectedFiles.filter(file =>
-        file.type.startsWith('audio/')
-    );
-
-    if (audioFiles.length === 0) {
-        alert('No audio files selected. Please select .mp3, .wav, .ogg, etc.');
-        return;
-    }
+function handleFilesSelected(event) {
+    const audioFiles = event.detail.files;
 
     // Add the new files to our playlist
     playerState.playlist.push(...audioFiles);
@@ -131,117 +69,14 @@ function handleFileSelection(event) {
         playerState.currentIndex = 0;
     }
 
-    // Update the UI to reflect the new playlist
-    updateFileCount();
-    renderPlaylist();
+    // Update the UI
+    updateAllComponents();
 }
 
 /**
- * Update the file count display
+ * Handle when the user clears the playlist
  */
-function updateFileCount() {
-    const count = playerState.playlist.length;
-
-    if (count === 0) {
-        DOM.fileCount.textContent = 'No files selected';
-    } else if (count === 1) {
-        DOM.fileCount.textContent = '1 file selected';
-    } else {
-        DOM.fileCount.textContent = `${count} files selected`;
-    }
-}
-
-// ============================================
-// PLAYLIST RENDERING
-// ============================================
-
-/**
- * Render the entire playlist to the DOM
- * This is called whenever the playlist changes
- */
-function renderPlaylist() {
-    // Clear the current playlist display
-    DOM.playlist.innerHTML = '';
-
-    // If no files, show empty state
-    if (playerState.playlist.length === 0) {
-        DOM.playlist.innerHTML = '<div class="playlist-empty">Select files to start playing</div>';
-        return;
-    }
-
-    // For each file in the playlist, create a list item
-    playerState.playlist.forEach((file, index) => {
-        // Create the list item element
-        const item = document.createElement('div');
-        item.className = 'playlist-item';
-
-        // Mark the currently playing track
-        if (index === playerState.currentIndex) {
-            item.classList.add('active');
-        }
-
-        // Set the content
-        item.innerHTML = `
-            <div class="playlist-item-title">${getFilenameStem(file)}</div>
-            <div class="playlist-item-filename">${file.name}</div>
-        `;
-
-        // When the user clicks this item, play it
-        item.addEventListener('click', () => {
-            playerState.currentIndex = index;
-            loadAndPlayTrack();
-            renderPlaylist(); // Re-render to show the new active track
-        });
-
-        // Add the item to the playlist
-        DOM.playlist.appendChild(item);
-    });
-
-    // Scroll the current track into view if it's playing
-    scrollCurrentTrackIntoView();
-
-    // Update the clear button state
-    updateClearButtonState();
-}
-
-/**
- * Scroll the currently playing track into view
- * This helps the user see which track is currently playing
- */
-function scrollCurrentTrackIntoView() {
-    if (playerState.currentIndex < 0 || playerState.currentIndex >= playerState.playlist.length) {
-        return;
-    }
-
-    // Get all playlist items
-    const playlistItems = DOM.playlist.querySelectorAll('.playlist-item');
-
-    // Get the currently playing item
-    const activeItem = playlistItems[playerState.currentIndex];
-
-    if (activeItem) {
-        // Scroll the active item into view
-        // 'nearest' means it will only scroll if the item is out of view
-        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-}
-
-/**
- * Clear the entire playlist
- * This stops playback and removes all tracks
- */
-function clearPlaylist() {
-    // Ask for confirmation before clearing (to avoid accidental loss)
-    if (playerState.playlist.length === 0) {
-        return;
-    }
-
-    const confirmed = confirm(`Are you sure you want to clear ${playerState.playlist.length} song(s)?`);
-
-    if (!confirmed) {
-        return; // User cancelled
-    }
-
+function handleClearPlaylist() {
     // Stop the audio
     DOM.audio.pause();
     DOM.audio.src = '';
@@ -252,70 +87,71 @@ function clearPlaylist() {
     playerState.isPlaying = false;
 
     // Update the UI
-    updateFileCount();
-    renderPlaylist();
-    updateNowPlayingInfo();
-    updatePlayButton();
-    updateProgress();
+    updateAllComponents();
+
+    // Reset file input
+    DOM.fileSelector.setCleared();
 }
 
+// ============================================
+// PLAYLIST & TRACK SELECTION
+// ============================================
+
 /**
- * Enable or disable the clear button based on whether there are songs
+ * Handle when the user clicks on a track in the playlist
  */
-function updateClearButtonState() {
-    DOM.clearBtn.disabled = playerState.playlist.length === 0;
+function handleTrackSelected(event) {
+    playerState.currentIndex = event.detail.index;
+    loadAndPlayTrack();
 }
 
-// ============================================
-// AUDIO LOADING & PLAYBACK
-// ============================================
-
 /**
- * Load the current track and start playing it
- * This handles reading the file and setting up the audio element
+ * Load and play the current track
  */
 function loadAndPlayTrack() {
-    // Check if we have a valid track to play
+    // Check if we have a valid track
     if (playerState.currentIndex < 0 || playerState.currentIndex >= playerState.playlist.length) {
         return;
     }
 
-    // Get the current file
     const currentFile = playerState.playlist[playerState.currentIndex];
 
-    // Create a URL that points to this file
-    // This is necessary to play local files in the browser
+    // Create a URL for the file
     const fileUrl = URL.createObjectURL(currentFile);
 
-    // Set the audio element's source
+    // Set the audio source and start playing
     DOM.audio.src = fileUrl;
-
-    // Update the "now playing" info
-    updateNowPlayingInfo();
-
-    // Start playing
     DOM.audio.play();
+
     playerState.isPlaying = true;
-    updatePlayButton();
+
+    // Update components
+    updateAllComponents();
 }
 
 /**
- * Update the "now playing" title and artist display
+ * Play the next track in the playlist
  */
-function updateNowPlayingInfo() {
-    if (playerState.currentIndex < 0 || playerState.currentIndex >= playerState.playlist.length) {
-        DOM.nowPlayingTitle.textContent = 'No track selected';
-        DOM.nowPlayingArtist.textContent = 'Select a file to start';
-        return;
+function playNextTrack() {
+    if (playerState.currentIndex < playerState.playlist.length - 1) {
+        playerState.currentIndex++;
+        loadAndPlayTrack();
     }
-
-    const file = playerState.playlist[playerState.currentIndex];
-
-    // For Phase 1, we just show the filename
-    // Phase 2 will parse ID3 tags for artist/album info
-    DOM.nowPlayingTitle.textContent = getFilenameStem(file);
-    DOM.nowPlayingArtist.textContent = `File: ${file.name}`;
 }
+
+/**
+ * Play the previous track in the playlist
+ */
+function playPreviousTrack() {
+    if (playerState.currentIndex > 0) {
+        playerState.currentIndex--;
+        loadAndPlayTrack();
+    }
+}
+
+// ============================================
+// PLAYBACK CONTROL
+// ============================================
 
 /**
  * Toggle between play and pause
@@ -330,196 +166,120 @@ function togglePlayPause() {
         return;
     }
 
-    // If we're playing, pause
+    // Toggle play/pause
     if (playerState.isPlaying) {
         DOM.audio.pause();
         playerState.isPlaying = false;
     } else {
-        // If we're paused, resume
         DOM.audio.play();
         playerState.isPlaying = true;
     }
 
-    updatePlayButton();
+    updateAllComponents();
 }
 
 /**
- * Update the play button text to match the current state
+ * Handle volume changes from the volume control
  */
-function updatePlayButton() {
-    DOM.playBtn.textContent = playerState.isPlaying ? '⏸ Pause' : '▶ Play';
+function handleVolumeChanged(event) {
+    const volume = event.detail.volume;
+    // Convert 0-100 to 0-1
+    DOM.audio.volume = volume / 100;
 }
 
 /**
- * Play the next track in the playlist
+ * Handle seeking from the progress bar
  */
-function playNextTrack() {
-    // If we're at the end, stop (or loop if you prefer)
-    if (playerState.currentIndex < playerState.playlist.length - 1) {
-        playerState.currentIndex++;
-        loadAndPlayTrack();
-        renderPlaylist();
-    }
-}
-
-/**
- * Play the previous track in the playlist
- */
-function playPreviousTrack() {
-    // If we're at the start, stop (or go to the end if you prefer)
-    if (playerState.currentIndex > 0) {
-        playerState.currentIndex--;
-        loadAndPlayTrack();
-        renderPlaylist();
-    }
+function handleSeek(event) {
+    const newTime = event.detail.time;
+    DOM.audio.currentTime = newTime;
 }
 
 // ============================================
-// PROGRESS BAR & SEEKING
+// AUDIO EVENTS
 // ============================================
 
 /**
- * Update the progress bar and time display
- * This is called frequently while the audio is playing
+ * Update progress bar as audio plays
  */
-function updateProgress() {
-    // Get the current playback position and duration
+function onTimeUpdate() {
     const currentTime = DOM.audio.currentTime;
     const duration = DOM.audio.duration;
-
-    // Calculate the progress as a percentage (0-100)
-    const progressPercent = (currentTime / duration) * 100;
-
-    // Update the visual progress bar
-    DOM.progressFill.style.width = `${progressPercent}%`;
-
-    // Update the time display
-    DOM.currentTime.textContent = formatTime(currentTime);
-    DOM.duration.textContent = formatTime(duration);
-
-    // Update the seek bar position (but only if the user isn't dragging it)
-    // This prevents the slider from jumping while the user is trying to seek
-    if (!DOM.seekBar.dataset.dragging) {
-        DOM.seekBar.max = duration || 100;
-        DOM.seekBar.value = currentTime || 0;
-    }
+    DOM.progressBar.updateProgress(currentTime, duration);
 }
 
 /**
- * Handle when the user clicks or drags the seek bar
+ * When track ends, play the next one
  */
-function handleSeek() {
-    // Get the new position directly - the seek bar's value is already in seconds
-    // because we set its max to the duration in updateProgress()
-    const newTime = parseFloat(DOM.seekBar.value);
-
-    // Update the audio playback position
-    DOM.audio.currentTime = newTime;
-
-    // Update the progress display immediately
-    updateProgress();
-}
-
-/**
- * Mark when the user starts dragging the seek bar
- */
-function startSeekDrag() {
-    DOM.seekBar.dataset.dragging = 'true';
-}
-
-/**
- * Mark when the user stops dragging the seek bar
- */
-function stopSeekDrag() {
-    DOM.seekBar.dataset.dragging = 'false';
-    handleSeek();
-}
-
-// ============================================
-// EVENT LISTENERS
-// ============================================
-
-// File selection
-DOM.fileInput.addEventListener('change', handleFileSelection);
-
-// Playlist management
-DOM.clearBtn.addEventListener('click', clearPlaylist);
-
-// Playback controls
-DOM.playBtn.addEventListener('click', togglePlayPause);
-DOM.nextBtn.addEventListener('click', playNextTrack);
-DOM.prevBtn.addEventListener('click', playPreviousTrack);
-
-// Progress bar and seeking
-DOM.seekBar.addEventListener('mousedown', startSeekDrag);
-DOM.seekBar.addEventListener('touchstart', startSeekDrag);
-DOM.seekBar.addEventListener('mouseup', stopSeekDrag);
-DOM.seekBar.addEventListener('touchend', stopSeekDrag);
-DOM.seekBar.addEventListener('input', handleSeek);
-
-// Audio element events
-// Update the progress bar as the audio plays
-DOM.audio.addEventListener('timeupdate', updateProgress);
-
-// When the track ends, play the next one
-DOM.audio.addEventListener('ended', () => {
+function onTrackEnd() {
     playNextTrack();
-});
+}
 
-// Update duration when metadata is loaded
-DOM.audio.addEventListener('loadedmetadata', updateProgress);
+/**
+ * When audio starts/stops, update the play button
+ */
+function onPlayPauseChange() {
+    playerState.isPlaying = !DOM.audio.paused;
+    DOM.playerControls.setPlayState(playerState.isPlaying);
+}
 
-// Update play/pause button when audio starts/stops
-DOM.audio.addEventListener('play', () => {
-    playerState.isPlaying = true;
-    updatePlayButton();
-});
+// ============================================
+// COMPONENT UPDATES
+// ============================================
 
-DOM.audio.addEventListener('pause', () => {
-    playerState.isPlaying = false;
-    updatePlayButton();
-});
+/**
+ * Update all components to reflect the current state
+ */
+function updateAllComponents() {
+    // Update playlist view
+    DOM.playlistView.setPlaylist(playerState.playlist);
+    if (playerState.currentIndex >= 0) {
+        DOM.playlistView.setCurrentTrack(playerState.currentIndex);
+    }
 
-// Volume control
-// When the user moves the volume slider, update the audio element's volume
-DOM.volumeSlider.addEventListener('input', (event) => {
-    // The slider ranges from 0-100, but audio.volume ranges from 0-1
-    // So we divide by 100 to convert
-    DOM.audio.volume = parseFloat(event.target.value) / 100;
-});
+    // Update file count
+    DOM.fileSelector.updateFileCount(playerState.playlist.length);
+
+    // Update now playing info
+    if (playerState.currentIndex >= 0 && playerState.currentIndex < playerState.playlist.length) {
+        const currentFile = playerState.playlist[playerState.currentIndex];
+        DOM.nowPlayingInfo.setTrack(currentFile);
+    } else {
+        DOM.nowPlayingInfo.clearTrack();
+    }
+
+    // Update play button
+    DOM.playerControls.setPlayState(playerState.isPlaying);
+}
 
 // ============================================
 // KEYBOARD SHORTCUTS
 // ============================================
 
 /**
- * Handle keyboard events for player control
+ * Handle keyboard shortcuts
  * Space: Play/Pause
  * Left Arrow: Previous track
  * Right Arrow: Next track
  */
 document.addEventListener('keydown', (event) => {
     // Don't respond to keyboard shortcuts if the user is typing in an input
-    // (e.g., if they're using the search box in Phase 4)
     if (event.target.tagName === 'INPUT' && event.target.type !== 'range') {
         return;
     }
 
     switch(event.code) {
         case 'Space':
-            // Prevent the default behavior (scrolling)
             event.preventDefault();
             togglePlayPause();
             break;
 
         case 'ArrowLeft':
-            // Prevent the default behavior (scrolling)
             event.preventDefault();
             playPreviousTrack();
             break;
 
         case 'ArrowRight':
-            // Prevent the default behavior (scrolling)
             event.preventDefault();
             playNextTrack();
             break;
@@ -527,17 +287,47 @@ document.addEventListener('keydown', (event) => {
 });
 
 // ============================================
+// EVENT LISTENERS - COMPONENTS
+// ============================================
+
+// File selector events
+DOM.fileSelector.addEventListener('files-selected', handleFilesSelected);
+DOM.fileSelector.addEventListener('clear-playlist', handleClearPlaylist);
+
+// Playlist events
+DOM.playlistView.addEventListener('track-selected', handleTrackSelected);
+
+// Player controls events
+DOM.playerControls.addEventListener('play-pause', togglePlayPause);
+DOM.playerControls.addEventListener('next-track', playNextTrack);
+DOM.playerControls.addEventListener('previous-track', playPreviousTrack);
+
+// Volume control events
+DOM.volumeControl.addEventListener('volume-changed', handleVolumeChanged);
+
+// Progress bar events
+DOM.progressBar.addEventListener('seek', handleSeek);
+
+// ============================================
+// EVENT LISTENERS - AUDIO ELEMENT
+// ============================================
+
+DOM.audio.addEventListener('timeupdate', onTimeUpdate);
+DOM.audio.addEventListener('ended', onTrackEnd);
+DOM.audio.addEventListener('play', onPlayPauseChange);
+DOM.audio.addEventListener('pause', onPlayPauseChange);
+DOM.audio.addEventListener('loadedmetadata', onTimeUpdate);
+
+// ============================================
 // INITIALIZATION
 // ============================================
 
-// On page load, set up the initial UI
 window.addEventListener('DOMContentLoaded', () => {
-    updateFileCount();
-    renderPlaylist();
-    updateNowPlayingInfo();
-    updatePlayButton();
-    updateClearButtonState();
+    // Set initial volume
+    DOM.audio.volume = DOM.volumeControl.getVolume() / 100;
 
-    // Set initial volume from the slider value
-    DOM.audio.volume = parseFloat(DOM.volumeSlider.value) / 100;
+    // Initialize UI
+    updateAllComponents();
+
+    console.log('🎵 Music Player initialized');
 });

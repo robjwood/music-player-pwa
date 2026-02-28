@@ -1,6 +1,9 @@
 /* ============================================
-   MUSIC PLAYER - SIMPLE & LIGHTWEIGHT
-   Inspired by CMUS (minimal, keyboard-friendly)
+   MUSIC PLAYER - GLOBAL STYLES
+
+   This file contains only the global layout.
+   Component-specific styles are in their
+   shadow DOM within each web component.
    ============================================ */
 
 * {
@@ -18,7 +21,10 @@ body {
     overflow: hidden;
 }
 
-/* Main container - flexbox layout with header, main, footer */
+/* ============================================
+   MAIN LAYOUT - Flexbox for header/main/footer
+   ============================================ */
+
 .player-container {
     display: flex;
     flex-direction: column;
@@ -29,6 +35,7 @@ body {
 /* ============================================
    HEADER
    ============================================ */
+
 .player-header {
     background-color: #0a0a0a;
     border-bottom: 1px solid #333;
@@ -43,6 +50,7 @@ body {
 /* ============================================
    MAIN CONTENT
    ============================================ */
+
 .player-main {
     flex: 1;
     display: flex;
@@ -50,321 +58,20 @@ body {
     overflow: hidden;
 }
 
-/* File selector */
-.file-selector {
-    padding: 1.5rem;
-    border-bottom: 1px solid #333;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-#fileInput {
-    display: none;
-}
-
-.file-label {
-    background-color: #2a2a2a;
-    border: 1px solid #444;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s;
-    user-select: none;
-}
-
-.file-label:hover {
-    background-color: #333;
-    border-color: #555;
-}
-
-.file-label:active {
-    background-color: #252525;
-}
-
-.clear-btn {
-    background-color: #8b3a3a;
-    border: 1px solid #a84949;
-    color: #e0e0e0;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.9rem;
-}
-
-.clear-btn:hover {
-    background-color: #a84949;
-    border-color: #c85959;
-}
-
-.clear-btn:active {
-    background-color: #743030;
-}
-
-.clear-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.file-count {
-    font-size: 0.9rem;
-    color: #888;
-}
-
-/* Playlist container */
-.playlist-container {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.5rem;
-}
-
-.playlist {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.playlist-empty {
-    padding: 2rem 1rem;
-    text-align: center;
-    color: #666;
-    font-style: italic;
-}
-
-/* Playlist items */
-.playlist-item {
-    padding: 0.75rem 1rem;
-    background-color: #252525;
-    border-left: 3px solid transparent;
-    cursor: pointer;
-    transition: all 0.15s;
-    border-radius: 2px;
-    user-select: none;
-}
-
-.playlist-item:hover {
-    background-color: #2a2a2a;
-}
-
-.playlist-item.active {
-    background-color: #333;
-    border-left-color: #4a9eff;
-    font-weight: 600;
-    box-shadow: 0 0 8px rgba(74, 158, 255, 0.2);
-}
-
-/* Visual indicator (▶) prefix for the now-playing track */
-.playlist-item.active::before {
-    content: '▶ ';
-    color: #4a9eff;
-    font-size: 0.8rem;
-    margin-right: 0.25rem;
-}
-
-.playlist-item-title {
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.playlist-item.active .playlist-item-title {
-    font-weight: 600;
-    color: #4a9eff;
-}
-
-.playlist-item-filename {
-    font-size: 0.85rem;
-    color: #888;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 /* ============================================
    FOOTER - PLAYER CONTROLS
    ============================================ */
+
 .player-footer {
     background-color: #0a0a0a;
     border-top: 1px solid #333;
     padding: 1rem;
 }
 
-/* Now playing info */
-.now-playing {
-    margin-bottom: 1rem;
-}
-
-.track-title {
-    font-weight: 600;
-    font-size: 1rem;
-    margin-bottom: 0.25rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.track-artist {
-    font-size: 0.9rem;
-    color: #888;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Progress bar section */
-.progress-container {
-    margin-bottom: 1rem;
-}
-
-.progress-bar {
-    position: relative;
-    height: 24px;
-    background-color: #1a1a1a;
-    border-radius: 4px;
-    margin-bottom: 0.5rem;
-    cursor: pointer;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background-color: #4a9eff;
-    width: 0%;
-    border-radius: 4px;
-    transition: width 0.1s;
-    pointer-events: none;
-}
-
-.seek-bar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    cursor: pointer;
-    z-index: 10;
-}
-
-.time-display {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.85rem;
-    color: #888;
-}
-
-/* Volume control */
-.volume-container {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-}
-
-.volume-label {
-    font-size: 1.2rem;
-    flex-shrink: 0;
-}
-
-.volume-slider {
-    flex: 1;
-    max-width: 150px;
-    height: 6px;
-    border-radius: 3px;
-    background-color: #1a1a1a;
-    outline: none;
-    -webkit-appearance: none;
-    appearance: none;
-}
-
-/* Styling the slider thumb for different browsers */
-.volume-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background-color: #4a9eff;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.volume-slider::-webkit-slider-thumb:hover {
-    background-color: #5aafff;
-    transform: scale(1.2);
-}
-
-.volume-slider::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background-color: #4a9eff;
-    cursor: pointer;
-    border: none;
-    transition: all 0.2s;
-}
-
-.volume-slider::-moz-range-thumb:hover {
-    background-color: #5aafff;
-    transform: scale(1.2);
-}
-
-.volume-slider::-moz-range-track {
-    background-color: transparent;
-    border: none;
-}
-
-/* Playback controls */
-.controls {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: center;
-}
-
-.control-btn {
-    background-color: #2a2a2a;
-    border: 1px solid #444;
-    color: #e0e0e0;
-    padding: 0.75rem 1.5rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: all 0.2s;
-    flex: 1;
-    max-width: 150px;
-}
-
-.control-btn:hover {
-    background-color: #333;
-    border-color: #555;
-}
-
-.control-btn:active {
-    background-color: #252525;
-}
-
-.control-btn--primary {
-    background-color: #4a9eff;
-    border-color: #4a9eff;
-    color: #000;
-    font-weight: 600;
-}
-
-.control-btn--primary:hover {
-    background-color: #5aafff;
-    border-color: #5aafff;
-}
-
-.control-btn--primary:active {
-    background-color: #3a8eef;
-    border-color: #3a8eef;
-}
-
 /* ============================================
    SCROLLBAR STYLING
    ============================================ */
+
 ::-webkit-scrollbar {
     width: 8px;
 }
@@ -385,15 +92,8 @@ body {
 /* ============================================
    ACCESSIBILITY & RESPONSIVE
    ============================================ */
+
 @media (max-width: 600px) {
-    .controls {
-        flex-direction: column;
-    }
-
-    .control-btn {
-        max-width: none;
-    }
-
     .player-header h1 {
         font-size: 1.25rem;
     }
