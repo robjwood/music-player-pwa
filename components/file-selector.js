@@ -89,7 +89,6 @@ class FileSelector extends HTMLElement {
                     cursor: pointer;
                     transition: all 0.2s;
                     user-select: none;
-                    font-size: 1rem;
                     font-family: inherit;
                 }
 
