@@ -15,10 +15,13 @@
 
         <!-- Main Content Area -->
         <main class="player-main">
-            <!-- File Selection Component -->
-            <file-selector></file-selector>
+            <!-- Left Panel: File Selector + Library Browser -->
+            <div class="left-panel">
+                <file-selector></file-selector>
+                <library-browser></library-browser>
+            </div>
 
-            <!-- Playlist Component -->
+            <!-- Right Panel: Playlist Component -->
             <playlist-view></playlist-view>
         </main>
 
@@ -43,12 +46,14 @@
 
     <!-- Import all components -->
     <script src="db.js"></script>
+    <script src="metadata.js"></script>
     <script src="components/now-playing.js"></script>
     <script src="components/volume-control.js"></script>
     <script src="components/progress-bar.js"></script>
     <script src="components/player-controls.js"></script>
     <script src="components/file-selector.js"></script>
     <script src="components/playlist-view.js"></script>
+    <script src="components/library-browser.js"></script>
 
     <!-- Main app logic -->
     <script src="app.js"></script>

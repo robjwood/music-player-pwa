@@ -19,7 +19,8 @@
 
 // This object holds all the state for our player
 const playerState = {
-    playlist: [],           // Array of File objects
+    library: [],            // Array of Track objects with metadata
+    playlist: [],           // Array of File objects (filtered subset of library)
     currentIndex: -1,       // Index of the currently selected track (-1 = none)
     isPlaying: false,       // Are we currently playing?
     fromFolder: false,      // Was the playlist loaded from a folder pick?
@@ -37,6 +38,7 @@ const DOM = {
     volumeControl: document.querySelector('volume-control'),
     progressBar: document.querySelector('progress-bar'),
     nowPlayingInfo: document.querySelector('now-playing-info'),
+    libraryBrowser: document.querySelector('library-browser'),
 };
 
 // ============================================
@@ -59,7 +61,7 @@ function getFilenameStem(file) {
 /**
  * Handle when the user selects files from a folder
  */
-function handleFilesSelected(event) {
+async function handleFilesSelected(event) {
     const audioFiles = event.detail.files;
     const wasEmpty = playerState.playlist.length === 0;
 
@@ -69,6 +71,15 @@ function handleFilesSelected(event) {
         saveLastTrackIndex(0);
     }
 
+    // Parse metadata asynchronously
+    const tracks = await MusicMetadata.parseAllMetadata(
+        audioFiles,
+        (loaded, total) => {
+            DOM.fileSelector.updateFileCount(`Loading metadata… ${loaded}/${total}`);
+        }
+    );
+    playerState.library.push(...tracks);
+
     // Add the new files to our playlist
     playerState.playlist.push(...audioFiles);
 
@@ -76,6 +87,9 @@ function handleFilesSelected(event) {
     if (playerState.currentIndex === -1 && playerState.playlist.length > 0) {
         playerState.currentIndex = 0;
     }
+
+    // Set library in browser (will emit library-filter-changed with all tracks)
+    DOM.libraryBrowser.setLibrary(playerState.library);
 
     // Update the UI
     updateAllComponents();
@@ -90,10 +104,14 @@ function handleClearPlaylist() {
     DOM.audio.src = '';
 
     // Reset the player state
+    playerState.library = [];
     playerState.playlist = [];
     playerState.currentIndex = -1;
     playerState.isPlaying = false;
     playerState.fromFolder = false;
+
+    // Clear library browser
+    DOM.libraryBrowser.setLibrary([]);
 
     // Clear persistence (but not volume preference)
     MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
@@ -101,6 +119,34 @@ function handleClearPlaylist() {
 
     // Update the UI
     updateAllComponents();
+}
+
+/**
+ * Handle when the library browser filters the library
+ */
+function handleLibraryFilterChanged(event) {
+    const filteredTracks = event.detail.tracks;
+    const currentFile = playerState.playlist[playerState.currentIndex] || null;
+
+    // Update playlist to filtered files
+    playerState.playlist = filteredTracks.map(t => t.file);
+
+    // Try to keep current track active in new view
+    const newIndex = currentFile ? playerState.playlist.indexOf(currentFile) : -1;
+    playerState.currentIndex = newIndex;
+
+    // Update UI components
+    DOM.playlistView.setPlaylist(playerState.playlist);
+    if (playerState.currentIndex >= 0) {
+        DOM.playlistView.setCurrentTrack(playerState.currentIndex);
+    }
+    DOM.fileSelector.updateFileCount(playerState.playlist.length);
+
+    // Update now-playing in case metadata display needs to change
+    if (playerState.currentIndex >= 0) {
+        const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
+        DOM.nowPlayingInfo.setTrack(currentFile, currentTrack);
+    }
 }
 
 // ============================================
@@ -260,7 +306,8 @@ function updateAllComponents() {
     // Update now playing info
     if (playerState.currentIndex >= 0 && playerState.currentIndex < playerState.playlist.length) {
         const currentFile = playerState.playlist[playerState.currentIndex];
-        DOM.nowPlayingInfo.setTrack(currentFile);
+        const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
+        DOM.nowPlayingInfo.setTrack(currentFile, currentTrack);
     } else {
         DOM.nowPlayingInfo.clearTrack();
     }
@@ -310,6 +357,9 @@ document.addEventListener('keydown', (event) => {
 // File selector events
 DOM.fileSelector.addEventListener('files-selected', handleFilesSelected);
 DOM.fileSelector.addEventListener('clear-playlist', handleClearPlaylist);
+
+// Library browser events
+DOM.libraryBrowser.addEventListener('library-filter-changed', handleLibraryFilterChanged);
 
 // Playlist events
 DOM.playlistView.addEventListener('track-selected', handleTrackSelected);
@@ -429,8 +479,15 @@ async function restoreFolderFromHandle(handle) {
             return;
         }
 
+        // Parse metadata
+        const tracks = await MusicMetadata.parseAllMetadata(audioFiles);
+        playerState.library = tracks;
+
         playerState.playlist = audioFiles;
         playerState.fromFolder = true;
+
+        // Set library in browser
+        DOM.libraryBrowser.setLibrary(playerState.library);
 
         // Restore the last track index
         const savedIndex = localStorage.getItem('music-player-last-index');

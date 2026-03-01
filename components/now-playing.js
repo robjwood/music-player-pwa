@@ -1,13 +1,13 @@
 /**
  * NOW PLAYING COMPONENT
  *
- * Displays the currently playing track title and artist/filename
+ * Displays the currently playing track title and artist from metadata or filename
  *
  * Usage:
  *   <now-playing-info></now-playing-info>
  *
  * Methods:
- *   setTrack(file) - Update the displayed track
+ *   setTrack(file, track) - Update the displayed track (track metadata optional)
  *   clearTrack() - Clear the display
  */
 
@@ -59,8 +59,9 @@ class NowPlayingInfo extends HTMLElement {
     /**
      * Update the display with a new track
      * @param {File} file - The audio file object
+     * @param {Track|null} track - Optional track metadata with { title, artist, album, track }
      */
-    setTrack(file) {
+    setTrack(file, track = null) {
         if (!file) {
             this.clearTrack();
             return;
@@ -69,11 +70,12 @@ class NowPlayingInfo extends HTMLElement {
         const titleEl = this.shadowRoot.querySelector('.track-title');
         const artistEl = this.shadowRoot.querySelector('.track-artist');
 
-        // Extract filename without extension
-        const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
+        // Use metadata if available, otherwise fall back to filename
+        const title = track?.title || file.name.replace(/\.[^/.]+$/, '');
+        const artist = track?.artist || 'Unknown Artist';
 
-        titleEl.textContent = nameWithoutExtension;
-        artistEl.textContent = `File: ${file.name}`;
+        titleEl.textContent = title;
+        artistEl.textContent = artist;
     }
 
     /**
