@@ -216,7 +216,7 @@ class FileSelector extends HTMLElement {
 
             // Emit custom event with found files, tagged as from folder
             this.dispatchEvent(new CustomEvent('files-selected', {
-                detail: { files: audioFiles, fromFolder: true },
+                detail: { files: audioFiles, fromFolder: true, folderName: dirHandle.name },
                 bubbles: true,
                 composed: true,
             }));

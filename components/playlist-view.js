@@ -1,7 +1,8 @@
 /**
  * PLAYLIST VIEW COMPONENT
  *
- * Displays all tracks in the playlist with click-to-play functionality
+ * Displays tracks grouped by album with CMUS-style formatting.
+ * Each track shows title + track number, with album headers.
  *
  * Usage:
  *   <playlist-view></playlist-view>
@@ -10,15 +11,27 @@
  *   - track-selected: { detail: { index: number } }
  *
  * Methods:
- *   setPlaylist(files) - Set the playlist to display
+ *   setTracks(tracks) - Set the Track[] to display (already sorted)
  *   setCurrentTrack(index) - Mark a track as currently playing
  */
+
+function formatDuration(secs) {
+    if (!secs || isNaN(secs)) return '--:--';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function parseTrackNumber(trackStr) {
+    const n = parseInt((trackStr || '').split('/')[0], 10);
+    return isNaN(n) ? 0 : n;
+}
 
 class PlaylistView extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
-        this.playlist = [];
+        this.tracks = [];
         this.currentIndex = -1;
         this.searchQuery = '';
     }
@@ -86,7 +99,6 @@ class PlaylistView extends HTMLElement {
                 .playlist {
                     display: flex;
                     flex-direction: column;
-                    gap: 0.25rem;
                     padding: 0.5rem;
                 }
 
@@ -97,13 +109,46 @@ class PlaylistView extends HTMLElement {
                     font-style: italic;
                 }
 
+                .album-header {
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 0.6rem 1rem 0.2rem;
+                    color: #888;
+                    font-size: 0.78rem;
+                    font-weight: 600;
+                    letter-spacing: 0.05em;
+                    text-transform: uppercase;
+                    border-top: 1px solid #2a2a2a;
+                    margin-top: 0.5rem;
+                }
+
+                .album-header:first-child {
+                    border-top: none;
+                    margin-top: 0;
+                }
+
+                .album-header-name {
+                    flex: 1;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+
+                .album-header-duration {
+                    color: #555;
+                    font-size: 0.78rem;
+                    margin-left: 1rem;
+                    white-space: nowrap;
+                }
+
                 .playlist-item {
-                    padding: 0.75rem 1rem;
-                    background-color: #252525;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0.35rem 1rem;
                     border-left: 3px solid transparent;
                     cursor: pointer;
-                    transition: all 0.15s;
-                    border-radius: 2px;
+                    transition: background 0.1s;
                     user-select: none;
                 }
 
@@ -118,7 +163,6 @@ class PlaylistView extends HTMLElement {
                     box-shadow: 0 0 8px rgba(74, 158, 255, 0.2);
                 }
 
-                /* Visual indicator (▶) prefix for the now-playing track */
                 .playlist-item.active::before {
                     content: '▶ ';
                     color: #4a9eff;
@@ -126,25 +170,24 @@ class PlaylistView extends HTMLElement {
                     margin-right: 0.25rem;
                 }
 
-                .playlist-item-title {
-                    font-weight: 500;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    color: #e0e0e0;
-                }
-
-                .playlist-item.active .playlist-item-title {
-                    font-weight: 600;
+                .playlist-item.active .track-label {
                     color: #4a9eff;
                 }
 
-                .playlist-item-filename {
-                    font-size: 0.85rem;
-                    color: #888;
-                    white-space: nowrap;
+                .track-label {
+                    flex: 1;
                     overflow: hidden;
                     text-overflow: ellipsis;
+                    white-space: nowrap;
+                    color: #e0e0e0;
+                    font-size: 0.9rem;
+                }
+
+                .track-meta {
+                    color: #555;
+                    font-size: 0.8rem;
+                    white-space: nowrap;
+                    margin-left: 1rem;
                 }
             </style>
 
@@ -183,11 +226,11 @@ class PlaylistView extends HTMLElement {
     }
 
     /**
-     * Set the playlist to display
-     * @param {File[]} files - Array of audio files
+     * Set the tracks to display (Track[] with metadata)
+     * @param {Track[]} tracks - Array of Track objects (already sorted)
      */
-    setPlaylist(files) {
-        this.playlist = files;
+    setTracks(tracks) {
+        this.tracks = tracks;
         this.searchQuery = '';
         const searchInput = this.shadowRoot.querySelector('.search-input');
         const searchClear = this.shadowRoot.querySelector('.search-clear');
@@ -209,60 +252,100 @@ class PlaylistView extends HTMLElement {
     }
 
     /**
-     * Render the playlist items
+     * Render the playlist items grouped by album
      */
     renderPlaylist() {
         const playlistEl = this.shadowRoot.querySelector('.playlist');
         playlistEl.innerHTML = '';
 
-        // Show empty state if no files
-        if (this.playlist.length === 0) {
+        // Show empty state if no tracks
+        if (this.tracks.length === 0) {
             playlistEl.innerHTML = '<div class="playlist-empty">Select files to start playing</div>';
             return;
         }
 
-        // Build filtered list keeping track of original indices
-        const items = this.playlist
-            .map((file, originalIndex) => ({ file, originalIndex }))
-            .filter(({ file }) =>
-                !this.searchQuery ||
-                file.name.toLowerCase().includes(this.searchQuery.toLowerCase())
-            );
+        // Filter by search query
+        const filtered = this.tracks.filter(t =>
+            !this.searchQuery ||
+            t.title.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+            t.artist.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+            t.album.toLowerCase().includes(this.searchQuery.toLowerCase())
+        );
 
         // Show "no results" message if search yielded no matches
-        if (items.length === 0 && this.searchQuery) {
+        if (filtered.length === 0 && this.searchQuery) {
             playlistEl.innerHTML = '<div class="playlist-empty">No tracks match your search</div>';
             return;
         }
 
-        // Create a list item for each filtered file
-        items.forEach(({ file, originalIndex }) => {
-            const item = document.createElement('div');
-            item.className = 'playlist-item';
+        // Group by album (preserving order from input)
+        const albums = [];
+        const seenAlbums = new Set();
 
-            // Mark the currently playing track
-            if (originalIndex === this.currentIndex) {
-                item.classList.add('active');
+        filtered.forEach(track => {
+            if (!seenAlbums.has(track.album)) {
+                albums.push({
+                    name: track.album,
+                    tracks: filtered.filter(t => t.album === track.album),
+                });
+                seenAlbums.add(track.album);
             }
+        });
 
-            // Get filename without extension
-            const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
+        // Render each album with its tracks
+        albums.forEach(album => {
+            // Album header
+            const totalDuration = album.tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
+            const durationStr = formatDuration(totalDuration);
 
-            item.innerHTML = `
-                <div class="playlist-item-title">${nameWithoutExtension}</div>
-                <div class="playlist-item-filename">${file.name}</div>
+            const header = document.createElement('div');
+            header.className = 'album-header';
+            header.innerHTML = `
+                <span class="album-header-name">${this.escapeHtml(album.name)}</span>
+                <span class="album-header-duration">${durationStr}</span>
             `;
+            playlistEl.appendChild(header);
 
-            // When user clicks this item, emit event with original index
-            item.addEventListener('click', () => {
-                this.dispatchEvent(new CustomEvent('track-selected', {
-                    detail: { index: originalIndex },
-                    bubbles: true,
-                    composed: true,
-                }));
+            // Track rows
+            album.tracks.forEach(track => {
+                const originalIndex = this.tracks.indexOf(track);
+                const item = document.createElement('div');
+                item.className = 'playlist-item';
+                item.setAttribute('data-index', originalIndex);
+
+                // Mark currently playing track
+                if (originalIndex === this.currentIndex) {
+                    item.classList.add('active');
+                }
+
+                // Format track label: "01. Track Title" or just "Track Title"
+                const trackNum = parseTrackNumber(track.track);
+                const trackLabel = trackNum > 0
+                    ? `${String(trackNum).padStart(2, '0')}. ${this.escapeHtml(track.title)}`
+                    : this.escapeHtml(track.title);
+
+                // Format meta: "year  duration" or just "duration" if no year
+                let trackMeta = formatDuration(track.duration);
+                if (track.year) {
+                    trackMeta = `${track.year}  ${trackMeta}`;
+                }
+
+                item.innerHTML = `
+                    <span class="track-label">${trackLabel}</span>
+                    <span class="track-meta">${trackMeta}</span>
+                `;
+
+                // Click handler
+                item.addEventListener('click', () => {
+                    this.dispatchEvent(new CustomEvent('track-selected', {
+                        detail: { index: originalIndex },
+                        bubbles: true,
+                        composed: true,
+                    }));
+                });
+
+                playlistEl.appendChild(item);
             });
-
-            playlistEl.appendChild(item);
         });
     }
 
@@ -271,10 +354,18 @@ class PlaylistView extends HTMLElement {
      */
     scrollCurrentTrackIntoView() {
         const activeItem = this.shadowRoot.querySelector('.playlist-item.active');
-
         if (activeItem) {
             activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
+    }
+
+    /**
+     * Escape HTML special characters (XSS protection)
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 

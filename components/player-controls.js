@@ -85,13 +85,13 @@ class PlayerControls extends HTMLElement {
 
             <div class="controls">
                 <button class="control-btn prev-btn" aria-label="Previous track (Left Arrow)">
-                    ⏮ Prev
+                    ⏮
                 </button>
                 <button class="control-btn control-btn--primary play-btn" aria-label="Play/Pause (Space)">
-                    ▶ Play
+                    ►
                 </button>
                 <button class="control-btn next-btn" aria-label="Next track (Right Arrow)">
-                    Next ⏭
+                    ⏭
                 </button>
             </div>
         `;
@@ -136,9 +136,9 @@ class PlayerControls extends HTMLElement {
         const playBtn = this.shadowRoot.querySelector('.play-btn');
 
         if (isPlaying) {
-            playBtn.textContent = '⏸ Pause';
+            playBtn.textContent = '⏸';
         } else {
-            playBtn.textContent = '▶ Play';
+            playBtn.textContent = '▶';
         }
     }
 }

@@ -21,7 +21,8 @@ class LibraryBrowser extends HTMLElement {
 
         this.library = []; // Track[] — full library with metadata
         this.view = 'artists'; // 'artists' | 'albums' | 'songs'
-        this.selectedEntity = null; // currently selected artist or album name
+        this.selectedArtist = null; // currently selected artist name
+        this.selectedAlbum = null; // currently selected album name (only in artists view)
     }
 
     connectedCallback() {
@@ -110,6 +111,28 @@ class LibraryBrowser extends HTMLElement {
                     text-align: center;
                 }
 
+                .album-item {
+                    padding: 0.3rem 0.5rem 0.3rem 1.75rem;
+                    font-size: 0.82rem;
+                    color: #888;
+                    border-left: 2px solid transparent;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    transition: all 0.1s ease;
+                }
+
+                .album-item:hover {
+                    color: #bbb;
+                    background: #1e1e1e;
+                }
+
+                .album-item.active {
+                    color: #4a9eff;
+                    border-left-color: #4a9eff;
+                }
+
                 ::-webkit-scrollbar {
                     width: 6px;
                 }
@@ -158,7 +181,8 @@ class LibraryBrowser extends HTMLElement {
     setLibrary(tracks) {
         this.library = tracks;
         this.view = 'artists';
-        this.selectedEntity = null;
+        this.selectedArtist = null;
+        this.selectedAlbum = null;
 
         this.renderEntityList();
 
@@ -172,7 +196,8 @@ class LibraryBrowser extends HTMLElement {
      */
     setView(mode) {
         this.view = mode;
-        this.selectedEntity = null;
+        this.selectedArtist = null;
+        this.selectedAlbum = null;
 
         // Update active button
         const modeButtons = this.shadowRoot.querySelectorAll('.mode-btn');
@@ -210,32 +235,114 @@ class LibraryBrowser extends HTMLElement {
                 if (track.artist) artistSet.add(track.artist);
             });
             entities = Array.from(artistSet).sort();
+
+            // Render artists with expandable albums
+            let html = '';
+            entities.forEach((artist, idx) => {
+                html += `<div class="entity-item ${this.selectedArtist === artist ? 'active' : ''}" data-entity="${idx}">
+                    ${this.escapeHtml(artist)}
+                </div>`;
+
+                // If artist is selected, show their albums indented below
+                if (this.selectedArtist === artist) {
+                    const artistTracks = this.library.filter(t => t.artist === artist);
+                    const albumSet = new Set();
+                    const albumYear = {};
+
+                    artistTracks.forEach(t => {
+                        if (t.album) {
+                            albumSet.add(t.album);
+                            const yr = parseInt(t.year, 10);
+                            if (!isNaN(yr)) {
+                                if (albumYear[t.album] === undefined || yr < albumYear[t.album]) {
+                                    albumYear[t.album] = yr;
+                                }
+                            }
+                        }
+                    });
+
+                    const albums = Array.from(albumSet).sort((a, b) => {
+                        const yearA = albumYear[a] ?? 9999;
+                        const yearB = albumYear[b] ?? 9999;
+                        return yearA !== yearB ? yearA - yearB : a.localeCompare(b);
+                    });
+
+                    albums.forEach((album, albumIdx) => {
+                        html += `<div class="album-item ${this.selectedAlbum === album ? 'active' : ''}" data-album="${albumIdx}">
+                            ${this.escapeHtml(album)}
+                        </div>`;
+                    });
+                }
+            });
+
+            listContainer.innerHTML = html;
+
+            // Add event listeners
+            const artistItems = listContainer.querySelectorAll('.entity-item');
+            artistItems.forEach((item) => {
+                item.addEventListener('click', () => {
+                    const artistName = entities[parseInt(item.dataset.entity, 10)];
+                    this.selectEntity(artistName);
+                });
+            });
+
+            const albumItems = listContainer.querySelectorAll('.album-item');
+            albumItems.forEach((item) => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // Get albums list for the current artist
+                    const artistTracks = this.library.filter(t => t.artist === this.selectedArtist);
+                    const albumSet = new Set();
+                    const albumYear = {};
+
+                    artistTracks.forEach(t => {
+                        if (t.album) {
+                            albumSet.add(t.album);
+                            const yr = parseInt(t.year, 10);
+                            if (!isNaN(yr)) {
+                                if (albumYear[t.album] === undefined || yr < albumYear[t.album]) {
+                                    albumYear[t.album] = yr;
+                                }
+                            }
+                        }
+                    });
+
+                    const albums = Array.from(albumSet).sort((a, b) => {
+                        const yearA = albumYear[a] ?? 9999;
+                        const yearB = albumYear[b] ?? 9999;
+                        return yearA !== yearB ? yearA - yearB : a.localeCompare(b);
+                    });
+
+                    const albumName = albums[parseInt(item.dataset.album, 10)];
+                    this.selectAlbum(albumName);
+                });
+            });
         } else if (this.view === 'albums') {
             const albumSet = new Set();
             this.library.forEach((track) => {
                 if (track.album) albumSet.add(track.album);
             });
             entities = Array.from(albumSet).sort();
-        }
 
-        // Render entity items
-        listContainer.innerHTML = entities
-            .map(
-                (entity, idx) =>
-                    `<div class="entity-item ${this.selectedEntity === entity ? 'active' : ''}" data-entity="${idx}">
-                        ${this.escapeHtml(entity)}
-                    </div>`
-            )
-            .join('');
+            // Render album items
+            listContainer.innerHTML = entities
+                .map(
+                    (entity, idx) =>
+                        `<div class="entity-item ${this.selectedAlbum === entity ? 'active' : ''}" data-entity="${idx}">
+                            ${this.escapeHtml(entity)}
+                        </div>`
+                )
+                .join('');
 
-        // Add event listeners to entity items
-        const items = listContainer.querySelectorAll('.entity-item');
-        items.forEach((item) => {
-            item.addEventListener('click', () => {
-                const entityName = entities[parseInt(item.dataset.entity, 10)];
-                this.selectEntity(entityName);
+            // Add event listeners to entity items
+            const items = listContainer.querySelectorAll('.entity-item');
+            items.forEach((item) => {
+                item.addEventListener('click', () => {
+                    const entityName = entities[parseInt(item.dataset.entity, 10)];
+                    this.selectEntity(entityName);
+                });
             });
-        });
+        }
     }
 
     /**
@@ -243,17 +350,50 @@ class LibraryBrowser extends HTMLElement {
      * @param {string} entityName
      */
     selectEntity(entityName) {
-        this.selectedEntity = entityName;
+        if (this.view === 'artists') {
+            // If clicking the same artist, collapse it
+            if (this.selectedArtist === entityName) {
+                this.selectedArtist = null;
+                this.selectedAlbum = null;
+                this.renderEntityList();
+                // Emit all tracks
+                this.emitFilterChanged(this.library);
+            } else {
+                // Switch to different artist
+                this.selectedArtist = entityName;
+                this.selectedAlbum = null;
+                this.renderEntityList();
+                // Emit all tracks by this artist
+                const filteredTracks = this.library.filter((track) => track.artist === entityName);
+                this.emitFilterChanged(filteredTracks);
+            }
+        } else if (this.view === 'albums') {
+            // Toggle album selection in albums view
+            if (this.selectedAlbum === entityName) {
+                this.selectedAlbum = null;
+                this.renderEntityList();
+                this.emitFilterChanged(this.library);
+            } else {
+                this.selectedAlbum = entityName;
+                this.renderEntityList();
+                const filteredTracks = this.library.filter((track) => track.album === entityName);
+                this.emitFilterChanged(filteredTracks);
+            }
+        }
+    }
+
+    /**
+     * Select an album within an artist (artists view only)
+     * @param {string} albumName
+     */
+    selectAlbum(albumName) {
+        this.selectedAlbum = albumName;
         this.renderEntityList();
 
-        // Filter the library
-        let filteredTracks = this.library;
-        if (this.view === 'artists') {
-            filteredTracks = this.library.filter((track) => track.artist === entityName);
-        } else if (this.view === 'albums') {
-            filteredTracks = this.library.filter((track) => track.album === entityName);
-        }
-
+        // Filter by artist AND album
+        const filteredTracks = this.library.filter(
+            (track) => track.artist === this.selectedArtist && track.album === albumName
+        );
         this.emitFilterChanged(filteredTracks);
     }
 

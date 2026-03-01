@@ -62,7 +62,7 @@ window.MusicMetadata = (() => {
     /**
      * Parse ID3v2 tags from a file
      * @param {File} file
-     * @returns {Promise<{title, artist, album, track}>}
+     * @returns {Promise<{title, artist, album, track, year}>}
      */
     async function parseID3v2(file) {
         try {
@@ -81,7 +81,7 @@ window.MusicMetadata = (() => {
             const tagBuffer = await file.slice(0, 10 + tagSize).arrayBuffer();
             const tagView = new Uint8Array(tagBuffer);
 
-            const metadata = { title: '', artist: '', album: '', track: '' };
+            const metadata = { title: '', artist: '', album: '', track: '', year: '' };
 
             // Parse frames (starting after 10-byte header)
             let offset = 10;
@@ -121,6 +121,18 @@ window.MusicMetadata = (() => {
                 } else if (frameId === 'TRCK') {
                     // Track number
                     metadata.track = decodeTextFrame(frameData).trim();
+                } else if (frameId === 'TDRC') {
+                    // Recording date (year)
+                    const dateStr = decodeTextFrame(frameData).trim();
+                    if (dateStr) {
+                        metadata.year = dateStr.substring(0, 4);
+                    }
+                } else if (frameId === 'TYER') {
+                    // Year (older ID3v2 frame)
+                    const yearStr = decodeTextFrame(frameData).trim();
+                    if (yearStr && !metadata.year) {
+                        metadata.year = yearStr.substring(0, 4);
+                    }
                 }
 
                 offset += 10 + frameSize;
@@ -136,7 +148,7 @@ window.MusicMetadata = (() => {
     /**
      * Parse ID3v1 tags from a file
      * @param {File} file
-     * @returns {Promise<{title, artist, album, track}>}
+     * @returns {Promise<{title, artist, album, track, year}>}
      */
     async function parseID3v1(file) {
         try {
@@ -154,8 +166,9 @@ window.MusicMetadata = (() => {
             const title = decoder.decode(tagView.slice(3, 33)).trim();
             const artist = decoder.decode(tagView.slice(33, 63)).trim();
             const album = decoder.decode(tagView.slice(63, 93)).trim();
+            const year = decoder.decode(tagView.slice(93, 97)).trim();
 
-            return { title, artist, album, track: '' };
+            return { title, artist, album, track: '', year };
         } catch (e) {
             console.warn('Failed to parse ID3v1:', e);
             return null;
@@ -163,20 +176,60 @@ window.MusicMetadata = (() => {
     }
 
     /**
+     * Get audio duration from file
+     * @param {File} file
+     * @returns {Promise<number>} Duration in seconds
+     */
+    function getAudioDuration(file) {
+        return new Promise((resolve) => {
+            const audio = new Audio();
+            const url = URL.createObjectURL(file);
+            audio.preload = 'metadata';
+
+            // Set a timeout to prevent hanging on files with metadata issues
+            const timeout = setTimeout(() => {
+                URL.revokeObjectURL(url);
+                resolve(0);
+            }, 5000);
+
+            const cleanup = () => {
+                clearTimeout(timeout);
+                URL.revokeObjectURL(url);
+            };
+
+            audio.addEventListener('loadedmetadata', () => {
+                cleanup();
+                resolve(audio.duration || 0);
+            }, { once: true });
+
+            audio.addEventListener('error', () => {
+                cleanup();
+                resolve(0);
+            }, { once: true });
+
+            audio.src = url;
+        });
+    }
+
+    /**
      * Parse metadata from a single file
      * @param {File} file
-     * @returns {Promise<Track>} { file, title, artist, album, track }
+     * @param {boolean} includeID3 - Whether to parse ID3 tags (slower, optional)
+     * @param {boolean} includeDuration - Whether to read audio duration (slower, optional)
+     * @returns {Promise<Track>} { file, title, artist, album, track, year, duration }
      */
-    async function parseMetadata(file) {
-        // Try ID3v2 first (more modern)
-        let metadata = await parseID3v2(file);
+    async function parseMetadata(file, includeID3 = true, includeDuration = true) {
+        let metadata = null;
 
-        // Fall back to ID3v1
-        if (!metadata) {
-            metadata = await parseID3v1(file);
+        // Try ID3v2 and ID3v1 if requested
+        if (includeID3) {
+            metadata = await parseID3v2(file);
+            if (!metadata) {
+                metadata = await parseID3v1(file);
+            }
         }
 
-        // Fall back to filename
+        // Fall back to filename if no ID3 tags found or skipped
         if (!metadata) {
             const title = file.name.replace(/\.[^/.]+$/, '');
             metadata = {
@@ -184,6 +237,7 @@ window.MusicMetadata = (() => {
                 artist: 'Unknown Artist',
                 album: 'Unknown Album',
                 track: '',
+                year: '',
             };
         }
 
@@ -192,6 +246,13 @@ window.MusicMetadata = (() => {
         if (!metadata.artist) metadata.artist = 'Unknown Artist';
         if (!metadata.album) metadata.album = 'Unknown Album';
         if (!metadata.track) metadata.track = '';
+        if (!metadata.year) metadata.year = '';
+
+        // Get audio duration (optional, can be skipped for fast restoration)
+        let duration = 0;
+        if (includeDuration) {
+            duration = await getAudioDuration(file);
+        }
 
         return {
             file,
@@ -199,6 +260,8 @@ window.MusicMetadata = (() => {
             artist: metadata.artist,
             album: metadata.album,
             track: metadata.track,
+            year: metadata.year,
+            duration,
         };
     }
 
@@ -206,15 +269,17 @@ window.MusicMetadata = (() => {
      * Parse metadata from multiple files in batches
      * @param {File[]} files
      * @param {Function} onProgress - Called with (loaded, total) after each batch
+     * @param {boolean} includeID3 - Whether to parse ID3 tags (default: true)
+     * @param {boolean} includeDuration - Whether to read audio duration (default: true)
      * @returns {Promise<Track[]>}
      */
-    async function parseAllMetadata(files, onProgress = null) {
+    async function parseAllMetadata(files, onProgress = null, includeID3 = true, includeDuration = true) {
         const results = [];
-        const batchSize = 10;
+        const batchSize = includeDuration ? 10 : 100; // Larger batches when skipping duration/ID3
 
         for (let i = 0; i < files.length; i += batchSize) {
             const batch = files.slice(i, i + batchSize);
-            const batchResults = await Promise.all(batch.map((f) => parseMetadata(f)));
+            const batchResults = await Promise.all(batch.map((f) => parseMetadata(f, includeID3, includeDuration)));
             results.push(...batchResults);
 
             if (onProgress) {

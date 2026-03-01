@@ -19,8 +19,9 @@
 
 // This object holds all the state for our player
 const playerState = {
-    library: [],            // Array of Track objects with metadata
-    playlist: [],           // Array of File objects (filtered subset of library)
+    library: [],            // Array of Track objects with metadata (all tracks)
+    displayedTracks: [],    // Array of Track objects (currently visible, sorted)
+    playlist: [],           // Array of File objects (parallel to displayedTracks)
     currentIndex: -1,       // Index of the currently selected track (-1 = none)
     isPlaying: false,       // Are we currently playing?
     fromFolder: false,      // Was the playlist loaded from a folder pick?
@@ -54,6 +55,34 @@ function getFilenameStem(file) {
     return nameWithExtension.replace(/\.[^/.]+$/, '');
 }
 
+/**
+ * Sort tracks by album year, album name, then track number
+ * @param {Track[]} tracks - Array of Track objects
+ * @returns {Track[]} Sorted array
+ */
+function sortTracksByAlbumAndNumber(tracks) {
+    // Determine canonical year per album (minimum year among all its tracks)
+    const albumYear = {};
+    tracks.forEach(t => {
+        const yr = parseInt(t.year, 10);
+        if (!isNaN(yr)) {
+            if (albumYear[t.album] === undefined || yr < albumYear[t.album]) {
+                albumYear[t.album] = yr;
+            }
+        }
+    });
+
+    return [...tracks].sort((a, b) => {
+        const yearA = albumYear[a.album] ?? 9999;
+        const yearB = albumYear[b.album] ?? 9999;
+        if (yearA !== yearB) return yearA - yearB;
+        if (a.album !== b.album) return a.album.localeCompare(b.album);
+        const nA = parseInt((a.track || '').split('/')[0], 10) || 0;
+        const nB = parseInt((b.track || '').split('/')[0], 10) || 0;
+        return nA - nB;
+    });
+}
+
 // ============================================
 // FILE HANDLING
 // ============================================
@@ -69,6 +98,9 @@ async function handleFilesSelected(event) {
     if (wasEmpty) {
         playerState.fromFolder = true;
         saveLastTrackIndex(0);
+    } else {
+        // User selected again without clearing — reset library to avoid duplicates
+        playerState.library = [];
     }
 
     // Parse metadata asynchronously
@@ -78,21 +110,41 @@ async function handleFilesSelected(event) {
             DOM.fileSelector.updateFileCount(`Loading metadata… ${loaded}/${total}`);
         }
     );
-    playerState.library.push(...tracks);
+    playerState.library = tracks;
 
-    // Add the new files to our playlist
-    playerState.playlist.push(...audioFiles);
+    // Sort tracks and create parallel playlist array
+    const sorted = sortTracksByAlbumAndNumber(playerState.library);
+    playerState.displayedTracks = sorted;
+    playerState.playlist = sorted.map(t => t.file);
 
     // If this is the first file, select it
     if (playerState.currentIndex === -1 && playerState.playlist.length > 0) {
         playerState.currentIndex = 0;
     }
 
+    // Cache metadata for this folder for instant restore next time
+    if (playerState.fromFolder && event.detail.folderName) {
+        console.log(`Caching metadata for folder: ${event.detail.folderName}`);
+        MusicPlayerDB.saveFolderMetadata(event.detail.folderName, playerState.library)
+            .then(() => console.log('Metadata cached successfully'))
+            .catch(err => console.warn('Failed to save metadata cache:', err));
+    }
+
     // Set library in browser (will emit library-filter-changed with all tracks)
     DOM.libraryBrowser.setLibrary(playerState.library);
 
     // Update the UI
-    updateAllComponents();
+    DOM.playlistView.setTracks(playerState.displayedTracks);
+    DOM.fileSelector.updateFileCount(playerState.playlist.length);
+    DOM.playlistView.setCurrentTrack(playerState.currentIndex);
+    DOM.playerControls.setPlayState(playerState.isPlaying);
+
+    // Update now-playing
+    if (playerState.currentIndex >= 0 && playerState.currentIndex < playerState.playlist.length) {
+        const currentFile = playerState.playlist[playerState.currentIndex];
+        const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
+        DOM.nowPlayingInfo.setTrack(currentFile, currentTrack);
+    }
 }
 
 /**
@@ -105,6 +157,7 @@ function handleClearPlaylist() {
 
     // Reset the player state
     playerState.library = [];
+    playerState.displayedTracks = [];
     playerState.playlist = [];
     playerState.currentIndex = -1;
     playerState.isPlaying = false;
@@ -128,15 +181,17 @@ function handleLibraryFilterChanged(event) {
     const filteredTracks = event.detail.tracks;
     const currentFile = playerState.playlist[playerState.currentIndex] || null;
 
-    // Update playlist to filtered files
-    playerState.playlist = filteredTracks.map(t => t.file);
+    // Sort filtered tracks
+    const sorted = sortTracksByAlbumAndNumber(filteredTracks);
+    playerState.displayedTracks = sorted;
+    playerState.playlist = sorted.map(t => t.file);
 
     // Try to keep current track active in new view
     const newIndex = currentFile ? playerState.playlist.indexOf(currentFile) : -1;
     playerState.currentIndex = newIndex;
 
     // Update UI components
-    DOM.playlistView.setPlaylist(playerState.playlist);
+    DOM.playlistView.setTracks(playerState.displayedTracks);
     if (playerState.currentIndex >= 0) {
         DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
@@ -295,7 +350,7 @@ function onPlayPauseChange() {
  */
 function updateAllComponents() {
     // Update playlist view
-    DOM.playlistView.setPlaylist(playerState.playlist);
+    DOM.playlistView.setTracks(playerState.displayedTracks);
     if (playerState.currentIndex >= 0) {
         DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
@@ -472,6 +527,65 @@ async function attemptFolderRestore() {
  */
 async function restoreFolderFromHandle(handle) {
     try {
+        const folderName = handle.name;
+        console.log(`Restoring folder: ${folderName}`);
+
+        // Try to load from cache first (instant restore)
+        const cached = await MusicPlayerDB.getFolderMetadata(folderName);
+        console.log(`Cache lookup for "${folderName}":`, cached ? 'HIT' : 'MISS');
+
+        if (cached) {
+            console.log('Using cached metadata (scanning for File objects)');
+            // Use cached metadata, but still need to scan for File objects
+            const audioFiles = await scanDirectory(handle);
+
+            const trackMap = {};
+            cached.tracks.forEach(t => {
+                trackMap[t.fileName] = t;
+            });
+
+            const tracks = audioFiles.map(file => {
+                const cachedTrack = trackMap[file.name];
+                return cachedTrack ? {
+                    file,
+                    title: cachedTrack.title,
+                    artist: cachedTrack.artist,
+                    album: cachedTrack.album,
+                    track: cachedTrack.track,
+                    year: cachedTrack.year,
+                    duration: cachedTrack.duration,
+                } : {
+                    file,
+                    title: file.name.replace(/\.[^/.]+$/, ''),
+                    artist: 'Unknown Artist',
+                    album: 'Unknown Album',
+                    track: '',
+                    year: '',
+                    duration: 0,
+                };
+            });
+
+            playerState.library = tracks;
+            const sorted = sortTracksByAlbumAndNumber(tracks);
+            playerState.displayedTracks = sorted;
+            playerState.playlist = sorted.map(t => t.file);
+            playerState.fromFolder = true;
+
+            DOM.libraryBrowser.setLibrary(playerState.library);
+
+            // Restore the last track index
+            const savedIndex = localStorage.getItem('music-player-last-index');
+            if (savedIndex !== null) {
+                const index = parseInt(savedIndex, 10);
+                if (!isNaN(index) && index >= 0 && index < playerState.playlist.length) {
+                    playerState.currentIndex = index;
+                }
+            }
+
+            return;
+        }
+
+        // Cache miss or folder changed - scan and parse
         const audioFiles = await scanDirectory(handle);
 
         if (audioFiles.length === 0) {
@@ -479,21 +593,27 @@ async function restoreFolderFromHandle(handle) {
             return;
         }
 
-        // Parse metadata
-        const tracks = await MusicMetadata.parseAllMetadata(audioFiles);
+        // Parse metadata (skip ID3 and duration on restore for speed)
+        const tracks = await MusicMetadata.parseAllMetadata(audioFiles, null, false, false);
         playerState.library = tracks;
 
-        playerState.playlist = audioFiles;
+        // Cache the metadata for next restore
+        MusicPlayerDB.saveFolderMetadata(folderName, tracks).catch(err => console.warn('Failed to save metadata cache:', err));
+
+        // Sort tracks and create playlist
+        const sorted = sortTracksByAlbumAndNumber(tracks);
+        playerState.displayedTracks = sorted;
+        playerState.playlist = sorted.map(t => t.file);
         playerState.fromFolder = true;
 
         // Set library in browser
         DOM.libraryBrowser.setLibrary(playerState.library);
 
-        // Restore the last track index
+        // Restore the last track index (into the sorted order)
         const savedIndex = localStorage.getItem('music-player-last-index');
         if (savedIndex !== null) {
             const index = parseInt(savedIndex, 10);
-            if (!isNaN(index) && index >= 0 && index < audioFiles.length) {
+            if (!isNaN(index) && index >= 0 && index < playerState.playlist.length) {
                 playerState.currentIndex = index;
             }
         }
