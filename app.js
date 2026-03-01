@@ -318,12 +318,26 @@ function handleSeek(event) {
 // ============================================
 
 /**
- * Update progress bar as audio plays
+ * Smooth progress bar updates using requestAnimationFrame
  */
-function onTimeUpdate() {
+let animationFrameId = null;
+
+function updateProgressSmooth() {
     const currentTime = DOM.audio.currentTime;
     const duration = DOM.audio.duration;
     DOM.progressBar.updateProgress(currentTime, duration);
+
+    // Continue updating while playing
+    if (!DOM.audio.paused) {
+        animationFrameId = requestAnimationFrame(updateProgressSmooth);
+    }
+}
+
+function onTimeUpdate() {
+    // Start smooth animation loop if not already running
+    if (DOM.audio.paused === false && !animationFrameId) {
+        animationFrameId = requestAnimationFrame(updateProgressSmooth);
+    }
 }
 
 /**
@@ -339,6 +353,12 @@ function onTrackEnd() {
 function onPlayPauseChange() {
     playerState.isPlaying = !DOM.audio.paused;
     DOM.playerControls.setPlayState(playerState.isPlaying);
+
+    // Cancel animation frame if paused
+    if (DOM.audio.paused && animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
 }
 
 // ============================================

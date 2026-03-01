@@ -55,8 +55,9 @@ class ProgressBar extends HTMLElement {
                     background-color: #4a9eff;
                     width: 0%;
                     border-radius: 4px;
-                    transition: width 0.1s;
                     pointer-events: none;
+                    will-change: width;
+                    transition: width 0.05s linear;
                 }
 
                 .seek-bar {
