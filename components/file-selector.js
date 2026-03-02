@@ -85,7 +85,6 @@ class FileSelector extends HTMLElement {
                     border: 1px solid #444;
                     color: #e0e0e0;
                     padding: 0.5rem 1rem;
-                    border-radius: 4px;
                     cursor: pointer;
                     transition: all 0.2s;
                     user-select: none;
@@ -279,7 +278,6 @@ class FileSelector extends HTMLElement {
                     padding: 0.75rem 1rem;
                     background-color: #2a3a2a;
                     border: 1px solid #4a7a4a;
-                    border-radius: 4px;
                     display: flex;
                     align-items: center;
                     gap: 0.75rem;
@@ -297,7 +295,6 @@ class FileSelector extends HTMLElement {
                     border: 1px solid #5a8a5a;
                     color: #d0e0d0;
                     padding: 0.4rem 0.8rem;
-                    border-radius: 3px;
                     cursor: pointer;
                     transition: all 0.2s;
                     font-size: 0.85rem;

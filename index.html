@@ -1,61 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Player</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Player</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
-    <div class="player-container">
-        <!-- Header -->
-        <header class="player-header">
-            <h1>Music Player</h1>
-        </header>
+  <div class="player-container">
+    <!-- Header -->
+    <header class="player-header">
+      <h1>Music Player</h1>
+    </header>
+    <file-selector></file-selector>
 
-        <!-- Main Content Area -->
-        <main class="player-main">
-            <!-- Left Panel: File Selector + Library Browser -->
-            <div class="left-panel">
-                <file-selector></file-selector>
-                <library-browser></library-browser>
-            </div>
+    <!-- Main Content Area -->
+    <main class="player-main">
+      <!-- Left Panel: File Selector + Library Browser -->
+      <div class="left-panel">
+        <library-browser></library-browser>
+      </div>
 
-            <!-- Right Panel: Playlist Component -->
-            <playlist-view></playlist-view>
-        </main>
+      <!-- Right Panel: Playlist Component -->
+      <playlist-view></playlist-view>
+    </main>
 
-        <!-- Player Controls (Bottom) -->
-        <footer class="player-footer">
-            <!-- Now Playing Info Component -->
-            <now-playing-info></now-playing-info>
+    <!-- Player Controls (Bottom) -->
+    <footer class="player-footer">
+      <!-- Now Playing Info Component -->
+      <now-playing-info></now-playing-info>
 
-            <!-- Progress Bar Component -->
-            <progress-bar></progress-bar>
+      <!-- Progress Bar Component -->
+      <progress-bar></progress-bar>
 
-            <!-- Volume Control Component -->
-            <volume-control></volume-control>
+      <!-- Player Controls Component -->
+      <player-controls></player-controls>
+    </footer>
+  </div>
 
-            <!-- Player Controls Component -->
-            <player-controls></player-controls>
-        </footer>
-    </div>
+  <!-- Hidden audio element - the actual player -->
+  <audio id="audioElement"></audio>
 
-    <!-- Hidden audio element - the actual player -->
-    <audio id="audioElement"></audio>
+  <!-- Import all components -->
+  <script src="db.js"></script>
+  <script src="metadata.js"></script>
+  <script src="components/now-playing.js"></script>
+  <script src="components/progress-bar.js"></script>
+  <script src="components/player-controls.js"></script>
+  <script src="components/file-selector.js"></script>
+  <script src="components/playlist-view.js"></script>
+  <script src="components/library-browser.js"></script>
 
-    <!-- Import all components -->
-    <script src="db.js"></script>
-    <script src="metadata.js"></script>
-    <script src="components/now-playing.js"></script>
-    <script src="components/volume-control.js"></script>
-    <script src="components/progress-bar.js"></script>
-    <script src="components/player-controls.js"></script>
-    <script src="components/file-selector.js"></script>
-    <script src="components/playlist-view.js"></script>
-    <script src="components/library-browser.js"></script>
-
-    <!-- Main app logic -->
-    <script src="app.js"></script>
+  <!-- Main app logic -->
+  <script src="app.js"></script>
 </body>
+
 </html>

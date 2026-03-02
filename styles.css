@@ -100,7 +100,6 @@ body {
 
 ::-webkit-scrollbar-thumb {
     background-color: #444;
-    border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {

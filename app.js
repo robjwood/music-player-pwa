@@ -36,7 +36,6 @@ const DOM = {
     fileSelector: document.querySelector('file-selector'),
     playlistView: document.querySelector('playlist-view'),
     playerControls: document.querySelector('player-controls'),
-    volumeControl: document.querySelector('volume-control'),
     progressBar: document.querySelector('progress-bar'),
     nowPlayingInfo: document.querySelector('now-playing-info'),
     libraryBrowser: document.querySelector('library-browser'),
@@ -295,17 +294,6 @@ function togglePlayPause() {
 }
 
 /**
- * Handle volume changes from the volume control
- */
-function handleVolumeChanged(event) {
-    const volume = event.detail.volume;
-    // Convert 0-100 to 0-1
-    DOM.audio.volume = volume / 100;
-    // Save volume preference
-    localStorage.setItem('music-player-volume', String(volume));
-}
-
-/**
  * Handle seeking from the progress bar
  */
 function handleSeek(event) {
@@ -444,9 +432,6 @@ DOM.playerControls.addEventListener('play-pause', togglePlayPause);
 DOM.playerControls.addEventListener('next-track', playNextTrack);
 DOM.playerControls.addEventListener('previous-track', playPreviousTrack);
 
-// Volume control events
-DOM.volumeControl.addEventListener('volume-changed', handleVolumeChanged);
-
 // Progress bar events
 DOM.progressBar.addEventListener('seek', handleSeek);
 
@@ -470,20 +455,6 @@ DOM.audio.addEventListener('loadedmetadata', onTimeUpdate);
 function saveLastTrackIndex(index) {
     if (playerState.fromFolder) {
         localStorage.setItem('music-player-last-index', String(index));
-    }
-}
-
-/**
- * Restore volume from localStorage
- */
-function restoreVolume() {
-    const savedVolume = localStorage.getItem('music-player-volume');
-    if (savedVolume !== null) {
-        const vol = parseFloat(savedVolume);
-        if (!isNaN(vol) && vol >= 0 && vol <= 100) {
-            DOM.volumeControl.setVolume(vol);
-            DOM.audio.volume = vol / 100;
-        }
     }
 }
 
@@ -648,8 +619,8 @@ async function restoreFolderFromHandle(handle) {
 // ============================================
 
 window.addEventListener('DOMContentLoaded', async () => {
-    // Restore volume preference
-    restoreVolume();
+    // Set default volume
+    DOM.audio.volume = 1.0;
 
     // Attempt to restore folder and playlist
     await attemptFolderRestore();

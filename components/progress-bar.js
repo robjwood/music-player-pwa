@@ -44,7 +44,6 @@ class ProgressBar extends HTMLElement {
                     position: relative;
                     height: 24px;
                     background-color: #1a1a1a;
-                    border-radius: 4px;
                     margin-bottom: 0.5rem;
                     cursor: pointer;
                     overflow: hidden;
@@ -54,7 +53,6 @@ class ProgressBar extends HTMLElement {
                     height: 100%;
                     background-color: #4a9eff;
                     width: 0%;
-                    border-radius: 4px;
                     pointer-events: none;
                     will-change: width;
                     transition: width 0.05s linear;

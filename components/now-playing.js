@@ -12,20 +12,20 @@
  */
 
 class NowPlayingInfo extends HTMLElement {
-    constructor() {
-        super();
-        this.attachShadow({ mode: 'open' });
-    }
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+  }
 
-    connectedCallback() {
-        this.render();
-    }
+  connectedCallback() {
+    this.render();
+  }
 
-    /**
-     * Render the component's HTML and styles
-     */
-    render() {
-        this.shadowRoot.innerHTML = `
+  /**
+   * Render the component's HTML and styles
+   */
+  render() {
+    this.shadowRoot.innerHTML = `
             <style>
                 :host {
                     display: block;
@@ -54,40 +54,40 @@ class NowPlayingInfo extends HTMLElement {
             <div class="track-title">No track selected</div>
             <div class="track-artist">Select a file to start</div>
         `;
+  }
+
+  /**
+   * Update the display with a new track
+   * @param {File} file - The audio file object
+   * @param {Track|null} track - Optional track metadata with { title, artist, album, track }
+   */
+  setTrack(file, track = null) {
+    if (!file) {
+      this.clearTrack();
+      return;
     }
 
-    /**
-     * Update the display with a new track
-     * @param {File} file - The audio file object
-     * @param {Track|null} track - Optional track metadata with { title, artist, album, track }
-     */
-    setTrack(file, track = null) {
-        if (!file) {
-            this.clearTrack();
-            return;
-        }
+    const titleEl = this.shadowRoot.querySelector('.track-title');
+    const artistEl = this.shadowRoot.querySelector('.track-artist');
 
-        const titleEl = this.shadowRoot.querySelector('.track-title');
-        const artistEl = this.shadowRoot.querySelector('.track-artist');
+    // Use metadata if available, otherwise fall back to filename
+    const title = track?.title || file.name.replace(/\.[^/.]+$/, '');
+    const artist = track?.artist || 'Unknown Artist';
 
-        // Use metadata if available, otherwise fall back to filename
-        const title = track?.title || file.name.replace(/\.[^/.]+$/, '');
-        const artist = track?.artist || 'Unknown Artist';
+    titleEl.textContent = title;
+    artistEl.textContent = artist;
+  }
 
-        titleEl.textContent = title;
-        artistEl.textContent = artist;
-    }
+  /**
+   * Clear the track display
+   */
+  clearTrack() {
+    const titleEl = this.shadowRoot.querySelector('.track-title');
+    const artistEl = this.shadowRoot.querySelector('.track-artist');
 
-    /**
-     * Clear the track display
-     */
-    clearTrack() {
-        const titleEl = this.shadowRoot.querySelector('.track-title');
-        const artistEl = this.shadowRoot.querySelector('.track-artist');
-
-        titleEl.textContent = 'No track selected';
-        artistEl.textContent = 'Select a file to start';
-    }
+    titleEl.textContent = 'No track selected';
+    artistEl.textContent = 'Select a file to start';
+  }
 }
 
 // Register the custom element

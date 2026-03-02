@@ -124,7 +124,6 @@ class LibraryBrowser extends HTMLElement {
 
                 ::-webkit-scrollbar-thumb {
                     background-color: #444;
-                    border-radius: 3px;
                 }
 
                 ::-webkit-scrollbar-thumb:hover {
