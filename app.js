@@ -21,10 +21,15 @@
 const playerState = {
     library: [],            // Array of Track objects with metadata (all tracks)
     displayedTracks: [],    // Array of Track objects (currently visible, sorted)
+    originalDisplayed: [],  // Original order (for shuffle/unshuffle)
     playlist: [],           // Array of File objects (parallel to displayedTracks)
+    playlists: [],          // Array of saved playlists
     currentIndex: -1,       // Index of the currently selected track (-1 = none)
     isPlaying: false,       // Are we currently playing?
+    isLooping: false,       // Should we loop the playlist when it ends?
+    isShuffling: false,     // Should we shuffle the playlist?
     fromFolder: false,      // Was the playlist loaded from a folder pick?
+    pendingTrack: null,     // Track waiting to be added to a playlist
 };
 
 // ============================================
@@ -82,6 +87,20 @@ function sortTracksByAlbumAndNumber(tracks) {
     });
 }
 
+/**
+ * Shuffle an array (Fisher-Yates algorithm)
+ * @param {Track[]} tracks - Array to shuffle
+ * @returns {Track[]} Shuffled copy
+ */
+function shuffleArray(tracks) {
+    const shuffled = [...tracks];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
 // ============================================
 // FILE HANDLING
 // ============================================
@@ -91,15 +110,14 @@ function sortTracksByAlbumAndNumber(tracks) {
  */
 async function handleFilesSelected(event) {
     const audioFiles = event.detail.files;
+    const folderHandle = event.detail.folderHandle;
+    const folderName = event.detail.folderName;
     const wasEmpty = playerState.playlist.length === 0;
 
     // Mark as folder-loaded (all selections are from folders now)
     if (wasEmpty) {
         playerState.fromFolder = true;
         saveLastTrackIndex(0);
-    } else {
-        // User selected again without clearing — reset library to avoid duplicates
-        playerState.library = [];
     }
 
     // Parse metadata asynchronously
@@ -109,28 +127,52 @@ async function handleFilesSelected(event) {
             DOM.fileSelector.updateFileCount(`Loading metadata… ${loaded}/${total}`);
         }
     );
-    playerState.library = tracks;
+
+    // Filter out duplicates (by filename) before adding
+    const existingFileNames = new Set(playerState.library.map(t => t.file.name));
+    const newTracks = tracks.filter(t => !existingFileNames.has(t.file.name));
+
+    // Track how many duplicates were skipped
+    const duplicateCount = tracks.length - newTracks.length;
+    if (duplicateCount > 0) {
+        console.log(`Skipped ${duplicateCount} duplicate file(s)`);
+    }
+
+    // Add tracks to library (instead of replacing)
+    playerState.library.push(...newTracks);
+
+    // Save folder handle for this folder
+    if (folderHandle) {
+        await MusicPlayerDB.addFolderHandle(folderHandle)
+            .catch(err => console.warn('Failed to save folder handle:', err));
+    }
+
+    // Cache metadata for this folder for instant restore next time
+    if (playerState.fromFolder && folderName) {
+        console.log(`Caching metadata for folder: ${folderName}`);
+        MusicPlayerDB.saveFolderMetadata(folderName, tracks)
+            .then(() => console.log('Metadata cached successfully'))
+            .catch(err => console.warn('Failed to save metadata cache:', err));
+    }
 
     // Sort tracks and create parallel playlist array
     const sorted = sortTracksByAlbumAndNumber(playerState.library);
     playerState.displayedTracks = sorted;
+    playerState.originalDisplayed = [];
+    playerState.isShuffling = false;
     playerState.playlist = sorted.map(t => t.file);
+    DOM.playerControls.setShuffleState(false);
 
     // If this is the first file, select it
     if (playerState.currentIndex === -1 && playerState.playlist.length > 0) {
         playerState.currentIndex = 0;
     }
 
-    // Cache metadata for this folder for instant restore next time
-    if (playerState.fromFolder && event.detail.folderName) {
-        console.log(`Caching metadata for folder: ${event.detail.folderName}`);
-        MusicPlayerDB.saveFolderMetadata(event.detail.folderName, playerState.library)
-            .then(() => console.log('Metadata cached successfully'))
-            .catch(err => console.warn('Failed to save metadata cache:', err));
-    }
-
     // Set library in browser (will emit library-filter-changed with all tracks)
     DOM.libraryBrowser.setLibrary(playerState.library);
+
+    // Load and set playlists
+    await loadAndSetPlaylists();
 
     // Update the UI
     DOM.playlistView.setTracks(playerState.displayedTracks);
@@ -166,7 +208,7 @@ function handleClearPlaylist() {
     DOM.libraryBrowser.setLibrary([]);
 
     // Clear persistence (but not volume preference)
-    MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+    MusicPlayerDB.clearAllFolderHandles().catch(err => console.warn('Failed to clear folder handle:', err));
     localStorage.removeItem('music-player-last-index');
 
     // Update the UI
@@ -180,10 +222,13 @@ function handleLibraryFilterChanged(event) {
     const filteredTracks = event.detail.tracks;
     const currentFile = playerState.playlist[playerState.currentIndex] || null;
 
-    // Sort filtered tracks
+    // Sort filtered tracks and reset shuffle
     const sorted = sortTracksByAlbumAndNumber(filteredTracks);
     playerState.displayedTracks = sorted;
+    playerState.originalDisplayed = [];
+    playerState.isShuffling = false;
     playerState.playlist = sorted.map(t => t.file);
+    DOM.playerControls.setShuffleState(false);
 
     // Try to keep current track active in new view
     const newIndex = currentFile ? playerState.playlist.indexOf(currentFile) : -1;
@@ -200,6 +245,18 @@ function handleLibraryFilterChanged(event) {
     if (playerState.currentIndex >= 0) {
         const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
         DOM.nowPlayingInfo.setTrack(currentFile, currentTrack);
+    }
+}
+
+/**
+ * Load playlists from IndexedDB and set them in the library browser
+ */
+async function loadAndSetPlaylists() {
+    try {
+        const playlists = await MusicPlayerDB.getPlaylists();
+        DOM.libraryBrowser.setPlaylists(playlists);
+    } catch (err) {
+        console.warn('Failed to load playlists:', err);
     }
 }
 
@@ -301,6 +358,148 @@ function handleSeek(event) {
     DOM.audio.currentTime = newTime;
 }
 
+/**
+ * Toggle loop mode
+ */
+function toggleLoop() {
+    playerState.isLooping = !playerState.isLooping;
+    DOM.playerControls.setLoopState(playerState.isLooping);
+}
+
+/**
+ * Handle adding a track to a playlist
+ */
+async function handleAddTrackToPlaylist(event) {
+    const track = event.detail.track;
+    playerState.pendingTrack = track;
+
+    // Load playlists and show modal
+    await loadAndShowPlaylistModal();
+}
+
+/**
+ * Load playlists and show the modal
+ */
+async function loadAndShowPlaylistModal() {
+    try {
+        playerState.playlists = await MusicPlayerDB.getPlaylists();
+        showPlaylistModal();
+    } catch (err) {
+        console.warn('Failed to load playlists:', err);
+        alert('Error loading playlists');
+    }
+}
+
+/**
+ * Show the playlist selection modal
+ */
+function showPlaylistModal() {
+    const modal = document.getElementById('playlistModal');
+    const playlistList = document.getElementById('playlistList');
+    const newPlaylistInput = document.getElementById('newPlaylistName');
+
+    // Clear previous list
+    playlistList.innerHTML = '';
+    newPlaylistInput.value = '';
+
+    // Show existing playlists
+    if (playerState.playlists.length > 0) {
+        playerState.playlists.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'playlist-option';
+            div.textContent = `${p.name} (${p.tracks.length})`;
+            div.addEventListener('click', () => {
+                addTrackToPlaylist(p.id);
+                modal.close();
+            });
+            playlistList.appendChild(div);
+        });
+    } else {
+        const msg = document.createElement('div');
+        msg.style.color = '#888';
+        msg.textContent = 'No playlists yet. Create one below.';
+        playlistList.appendChild(msg);
+    }
+
+    modal.showModal();
+}
+
+/**
+ * Add the pending track to a playlist
+ */
+async function addTrackToPlaylist(playlistId) {
+    if (!playerState.pendingTrack) return;
+
+    try {
+        await MusicPlayerDB.addTrackToPlaylist(playlistId, playerState.pendingTrack);
+        alert(`Added to playlist!`);
+        playerState.pendingTrack = null;
+        // Reload playlists in sidebar
+        await loadAndSetPlaylists();
+    } catch (err) {
+        console.warn('Failed to add track to playlist:', err);
+        alert('Error adding track to playlist');
+    }
+}
+
+/**
+ * Create a new playlist and add track
+ */
+async function createAndAddPlaylist() {
+    const playlistName = document.getElementById('newPlaylistName').value.trim();
+    if (!playlistName) {
+        alert('Please enter a playlist name');
+        return;
+    }
+
+    try {
+        const playlistId = await MusicPlayerDB.createPlaylist(playlistName);
+        await addTrackToPlaylist(playlistId);
+        // addTrackToPlaylist already reloads playlists
+        document.getElementById('playlistModal').close();
+    } catch (err) {
+        console.warn('Failed to create playlist:', err);
+        alert('Error creating playlist');
+    }
+}
+
+/**
+ * Toggle shuffle mode
+ */
+function toggleShuffle() {
+    playerState.isShuffling = !playerState.isShuffling;
+
+    if (playerState.isShuffling) {
+        // Save the original order and shuffle
+        playerState.originalDisplayed = playerState.displayedTracks;
+        playerState.displayedTracks = shuffleArray(playerState.displayedTracks);
+    } else {
+        // Restore original order
+        playerState.displayedTracks = playerState.originalDisplayed;
+        playerState.originalDisplayed = [];
+    }
+
+    // Update playlist File array to match the new order
+    playerState.playlist = playerState.displayedTracks.map(t => t.file);
+
+    // Re-find the current track in the new order
+    const currentFile = DOM.audio.src ? playerState.playlist.find(f => URL.createObjectURL(f) === DOM.audio.src) : null;
+    if (currentFile) {
+        playerState.currentIndex = playerState.playlist.indexOf(currentFile);
+    } else if (playerState.currentIndex >= 0 && playerState.currentIndex < playerState.playlist.length) {
+        // Keep current index if it's still valid
+    } else {
+        playerState.currentIndex = -1;
+    }
+
+    // Update UI
+    DOM.playerControls.setShuffleState(playerState.isShuffling);
+    DOM.playlistView.setTracks(playerState.displayedTracks);
+    if (playerState.currentIndex >= 0) {
+        DOM.playlistView.setCurrentTrack(playerState.currentIndex);
+    }
+}
+
 // ============================================
 // AUDIO EVENTS
 // ============================================
@@ -329,10 +528,21 @@ function onTimeUpdate() {
 }
 
 /**
- * When track ends, play the next one
+ * When track ends, play the next one (or loop to beginning if enabled)
  */
 function onTrackEnd() {
-    playNextTrack();
+    if (playerState.currentIndex >= playerState.playlist.length - 1) {
+        // At the end of playlist
+        if (playerState.isLooping) {
+            // Loop back to beginning
+            playerState.currentIndex = 0;
+            loadAndPlayTrack();
+        }
+        // Otherwise do nothing (stop playing)
+    } else {
+        // Not at end, play next track
+        playNextTrack();
+    }
 }
 
 /**
@@ -426,11 +636,28 @@ DOM.libraryBrowser.addEventListener('library-filter-changed', handleLibraryFilte
 
 // Playlist events
 DOM.playlistView.addEventListener('track-selected', handleTrackSelected);
+DOM.playlistView.addEventListener('add-track-to-playlist', handleAddTrackToPlaylist);
+
+// Playlist Modal events
+document.getElementById('closePlaylistModal').addEventListener('click', () => {
+    document.getElementById('playlistModal').close();
+});
+
+document.getElementById('createPlaylistBtn').addEventListener('click', createAndAddPlaylist);
+
+// Close modal when clicking outside
+document.getElementById('playlistModal').addEventListener('click', (e) => {
+    if (e.target.id === 'playlistModal') {
+        e.target.close();
+    }
+});
 
 // Player controls events
 DOM.playerControls.addEventListener('play-pause', togglePlayPause);
 DOM.playerControls.addEventListener('next-track', playNextTrack);
 DOM.playerControls.addEventListener('previous-track', playPreviousTrack);
+DOM.playerControls.addEventListener('toggle-loop', toggleLoop);
+DOM.playerControls.addEventListener('toggle-shuffle', toggleShuffle);
 
 // Progress bar events
 DOM.progressBar.addEventListener('seek', handleSeek);
@@ -467,28 +694,44 @@ async function attemptFolderRestore() {
         return;
     }
 
-    // Try to retrieve the stored folder handle
-    let handle;
+    // Try to retrieve all saved folder handles
+    let handles;
     try {
-        handle = await MusicPlayerDB.getFolderHandle();
+        handles = await MusicPlayerDB.getFolderHandles();
     } catch (err) {
-        console.warn('Failed to retrieve folder handle from IndexedDB:', err);
+        console.warn('Failed to retrieve folder handles from IndexedDB:', err);
         return;
     }
 
-    if (!handle) {
+    if (!handles || handles.length === 0) {
         return;
     }
 
-    // Check permission status
-    try {
-        const permission = await handle.queryPermission({ mode: 'read' });
+    // Process each saved folder
+    const bannersToShow = [];
+    for (const handle of handles) {
+        try {
+            const permission = await handle.queryPermission({ mode: 'read' });
 
-        if (permission === 'granted') {
-            // Permission already granted, restore silently
-            await restoreFolderFromHandle(handle);
-        } else if (permission === 'prompt') {
-            // Permission needs to be re-granted, show banner
+            if (permission === 'granted') {
+                // Permission already granted, restore silently
+                await restoreFolderFromHandle(handle);
+            } else if (permission === 'prompt') {
+                // Permission needs to be re-granted, queue banner
+                bannersToShow.push(handle);
+            } else {
+                // Permission denied, remove this handle
+                await MusicPlayerDB.removeFolderHandle(handle.name)
+                    .catch(err => console.warn('Failed to remove folder handle:', err));
+            }
+        } catch (err) {
+            console.warn(`Failed to check permission for folder ${handle.name}:`, err);
+        }
+    }
+
+    // Show banners for folders that need permission
+    if (bannersToShow.length > 0) {
+        for (const handle of bannersToShow) {
             DOM.fileSelector.showRestoreBanner(handle.name, async () => {
                 try {
                     const result = await handle.requestPermission({ mode: 'read' });
@@ -496,20 +739,16 @@ async function attemptFolderRestore() {
                         await restoreFolderFromHandle(handle);
                         updateAllComponents();
                     } else {
-                        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+                        await MusicPlayerDB.removeFolderHandle(handle.name)
+                            .catch(err => console.warn('Failed to remove folder handle:', err));
                     }
                 } catch (err) {
                     console.warn('Failed to request permission:', err);
-                    MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+                    await MusicPlayerDB.removeFolderHandle(handle.name)
+                        .catch(err => console.warn('Failed to remove folder handle:', err));
                 }
             });
-        } else {
-            // Permission denied, clear stored handle
-            MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
         }
-    } catch (err) {
-        console.warn('Failed to check permission or restore folder:', err);
-        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
     }
 }
 
@@ -556,13 +795,21 @@ async function restoreFolderFromHandle(handle) {
                 };
             });
 
-            playerState.library = tracks;
-            const sorted = sortTracksByAlbumAndNumber(tracks);
-            playerState.displayedTracks = sorted;
-            playerState.playlist = sorted.map(t => t.file);
+            // Filter out duplicates before adding (for multiple folder support)
+            const existingFileNames = new Set(playerState.library.map(t => t.file.name));
+            const newTracks = tracks.filter(t => !existingFileNames.has(t.file.name));
+
+            // Add tracks to library
+            playerState.library.push(...newTracks);
             playerState.fromFolder = true;
 
+            // Re-sort entire library and update display
+            const sorted = sortTracksByAlbumAndNumber(playerState.library);
+            playerState.displayedTracks = sorted;
+            playerState.playlist = sorted.map(t => t.file);
+
             DOM.libraryBrowser.setLibrary(playerState.library);
+            await loadAndSetPlaylists();
 
             // Restore the last track index
             const savedIndex = localStorage.getItem('music-player-last-index');
@@ -580,25 +827,32 @@ async function restoreFolderFromHandle(handle) {
         const audioFiles = await scanDirectory(handle);
 
         if (audioFiles.length === 0) {
-            MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+            MusicPlayerDB.clearAllFolderHandles().catch(err => console.warn('Failed to clear folder handle:', err));
             return;
         }
 
         // Parse metadata (skip ID3 and duration on restore for speed)
         const tracks = await MusicMetadata.parseAllMetadata(audioFiles, null, false, false);
-        playerState.library = tracks;
+
+        // Filter out duplicates before adding (for multiple folder support)
+        const existingFileNames = new Set(playerState.library.map(t => t.file.name));
+        const newTracks = tracks.filter(t => !existingFileNames.has(t.file.name));
+
+        // Add tracks to library
+        playerState.library.push(...newTracks);
 
         // Cache the metadata for next restore
         MusicPlayerDB.saveFolderMetadata(folderName, tracks).catch(err => console.warn('Failed to save metadata cache:', err));
 
-        // Sort tracks and create playlist
-        const sorted = sortTracksByAlbumAndNumber(tracks);
+        // Sort entire library and create playlist
+        const sorted = sortTracksByAlbumAndNumber(playerState.library);
         playerState.displayedTracks = sorted;
         playerState.playlist = sorted.map(t => t.file);
         playerState.fromFolder = true;
 
         // Set library in browser
         DOM.libraryBrowser.setLibrary(playerState.library);
+        await loadAndSetPlaylists();
 
         // Restore the last track index (into the sorted order)
         const savedIndex = localStorage.getItem('music-player-last-index');
@@ -610,7 +864,7 @@ async function restoreFolderFromHandle(handle) {
         }
     } catch (err) {
         console.warn('Failed to restore folder from handle:', err);
-        MusicPlayerDB.clearFolderHandle().catch(err => console.warn('Failed to clear folder handle:', err));
+        MusicPlayerDB.clearAllFolderHandles().catch(err => console.warn('Failed to clear folder handle:', err));
     }
 }
 
@@ -624,6 +878,11 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Attempt to restore folder and playlist
     await attemptFolderRestore();
+
+    // Load playlists (if folder restore didn't already load them)
+    if (playerState.library.length === 0) {
+        await loadAndSetPlaylists();
+    }
 
     // Initialize UI
     updateAllComponents();

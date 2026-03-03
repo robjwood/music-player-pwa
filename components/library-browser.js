@@ -20,8 +20,10 @@ class LibraryBrowser extends HTMLElement {
         this.attachShadow({ mode: 'open' });
 
         this.library = []; // Track[] — full library with metadata
+        this.playlists = []; // Playlist[] — user-created playlists
         this.selectedArtist = null; // currently selected artist name
         this.selectedAlbum = null; // currently selected album name
+        this.selectedPlaylist = null; // currently selected playlist ID
     }
 
     connectedCallback() {
@@ -53,6 +55,17 @@ class LibraryBrowser extends HTMLElement {
                     color: #888;
                     text-transform: uppercase;
                     letter-spacing: 0.05em;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .library-header:hover {
+                    background-color: #1a1a1a;
+                }
+
+                .library-header.active {
+                    color: #4a9eff;
+                    border-bottom-color: #4a9eff;
                 }
 
                 .entity-list {
@@ -131,16 +144,55 @@ class LibraryBrowser extends HTMLElement {
                 }
             </style>
 
-            <div class="library-header">Artist / Album</div>
+            <div style="display: flex; border-bottom: 1px solid #333;">
+                <div class="library-header" style="flex: 1; border: none; border-bottom: 2px solid transparent; margin: 0; padding: 0.6rem 1rem;" data-view="artists">
+                    Artist / Album
+                </div>
+                <div class="library-header" style="flex: 1; border: none; border-bottom: 2px solid transparent; margin: 0; padding: 0.6rem 1rem;" data-view="playlists">
+                    Playlists
+                </div>
+            </div>
             <div class="entity-list"></div>
         `;
     }
 
     /**
-     * Setup event listeners (currently none needed)
+     * Setup event listeners for view switching
      */
     setupEventListeners() {
-        // Event listeners are set up in renderEntityList
+        const viewHeaders = this.shadowRoot.querySelectorAll('[data-view]');
+        viewHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                const view = header.dataset.view;
+                this.switchView(view);
+            });
+        });
+    }
+
+    /**
+     * Switch between Artists and Playlists view
+     * @param {string} view - 'artists' or 'playlists'
+     */
+    switchView(view) {
+        this.view = view;
+        this.selectedArtist = null;
+        this.selectedAlbum = null;
+        this.selectedPlaylist = null;
+
+        // Update active tab styling
+        const headers = this.shadowRoot.querySelectorAll('[data-view]');
+        headers.forEach(h => {
+            if (h.dataset.view === view) {
+                h.style.borderBottomColor = '#4a9eff';
+                h.style.color = '#4a9eff';
+            } else {
+                h.style.borderBottomColor = 'transparent';
+                h.style.color = '#888';
+            }
+        });
+
+        this.renderEntityList();
+        this.emitFilterChanged(this.library);
     }
 
     /**
@@ -151,6 +203,7 @@ class LibraryBrowser extends HTMLElement {
         this.library = tracks;
         this.selectedArtist = null;
         this.selectedAlbum = null;
+        this.view = 'artists';
 
         this.renderEntityList();
 
@@ -159,11 +212,25 @@ class LibraryBrowser extends HTMLElement {
     }
 
     /**
-     * Render the artist/album hierarchy
+     * Set the playlists to display
+     * @param {object[]} playlists - Array of playlist objects
+     */
+    setPlaylists(playlists) {
+        this.playlists = playlists;
+    }
+
+    /**
+     * Render the artist/album hierarchy or playlist list based on current view
      */
     renderEntityList() {
         const listContainer = this.shadowRoot.querySelector('.entity-list');
 
+        if (this.view === 'playlists') {
+            this.renderPlaylistList();
+            return;
+        }
+
+        // Artists view
         if (this.library.length === 0) {
             listContainer.innerHTML = '<div class="no-library">No library loaded</div>';
             return;
@@ -295,6 +362,79 @@ class LibraryBrowser extends HTMLElement {
             (track) => track.artist === this.selectedArtist && track.album === albumName
         );
         this.emitFilterChanged(filteredTracks);
+    }
+
+    /**
+     * Render the playlist list
+     */
+    renderPlaylistList() {
+        const listContainer = this.shadowRoot.querySelector('.entity-list');
+
+        if (this.playlists.length === 0) {
+            listContainer.innerHTML = '<div class="no-library">No playlists created yet</div>';
+            return;
+        }
+
+        let html = '';
+        this.playlists.forEach((playlist, idx) => {
+            const trackCount = playlist.tracks ? playlist.tracks.length : 0;
+            html += `<div class="entity-item ${this.selectedPlaylist === playlist.id ? 'active' : ''}" data-playlist="${idx}">
+                ${this.escapeHtml(playlist.name)}
+                <span style="color: #666; font-size: 0.75rem; margin-left: 0.5rem;">(${trackCount})</span>
+            </div>`;
+        });
+
+        listContainer.innerHTML = html;
+
+        // Add event listeners
+        const playlistItems = listContainer.querySelectorAll('.entity-item');
+        playlistItems.forEach((item) => {
+            item.addEventListener('click', () => {
+                const playlistIdx = parseInt(item.dataset.playlist, 10);
+                const playlist = this.playlists[playlistIdx];
+                this.selectPlaylist(playlist);
+            });
+        });
+    }
+
+    /**
+     * Select a playlist and filter the library to its tracks
+     * @param {object} playlist
+     */
+    selectPlaylist(playlist) {
+        // If clicking the same playlist, deselect it
+        if (this.selectedPlaylist === playlist.id) {
+            this.selectedPlaylist = null;
+            this.renderPlaylistList();
+            // Emit all tracks
+            this.emitFilterChanged(this.library);
+        } else {
+            // Switch to different playlist
+            this.selectedPlaylist = playlist.id;
+            this.renderPlaylistList();
+
+            // Build filtered tracks, preferring library matches but falling back to metadata
+            const filteredTracks = playlist.tracks.map(pt => {
+                // Try to find this track in the library
+                const libraryTrack = this.library.find(t => t.file.name === pt.fileName);
+                if (libraryTrack) {
+                    return libraryTrack;
+                }
+                // If not found in library, use playlist metadata with synthetic file object
+                return {
+                    file: { name: pt.fileName },
+                    title: pt.title,
+                    artist: pt.artist,
+                    album: pt.album,
+                    track: pt.track,
+                    year: pt.year,
+                    duration: pt.duration,
+                    unavailable: true,  // Mark as unavailable since file is not in library
+                };
+            });
+
+            this.emitFilterChanged(filteredTracks);
+        }
     }
 
     /**

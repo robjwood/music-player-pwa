@@ -20,6 +20,8 @@ class PlayerControls extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this.isPlaying = false;
+    this.isLooping = false;
+    this.isShuffling = false;
   }
 
   connectedCallback() {
@@ -80,9 +82,23 @@ class PlayerControls extends HTMLElement {
             background-color: #3a8eef;
             border-color: #3a8eef;
           }
+
+          .control-btn.active {
+            background-color: #4a9eff;
+            border-color: #4a9eff;
+            color: #000;
+          }
+
+          .control-btn.active:hover {
+            background-color: #5aafff;
+            border-color: #5aafff;
+          }
       </style>
 
       <div class="controls">
+          <button class="control-btn shuffle-btn" aria-label="Toggle shuffle">
+              🔀
+          </button>
           <button class="control-btn prev-btn" aria-label="Previous track (Left Arrow)">
               ⏮
           </button>
@@ -91,6 +107,9 @@ class PlayerControls extends HTMLElement {
           </button>
           <button class="control-btn next-btn" aria-label="Next track (Right Arrow)">
               ⏭
+          </button>
+          <button class="control-btn loop-btn" aria-label="Toggle loop">
+              🔁
           </button>
       </div>
     `;
@@ -103,6 +122,8 @@ class PlayerControls extends HTMLElement {
     const playBtn = this.shadowRoot.querySelector('.play-btn');
     const nextBtn = this.shadowRoot.querySelector('.next-btn');
     const prevBtn = this.shadowRoot.querySelector('.prev-btn');
+    const loopBtn = this.shadowRoot.querySelector('.loop-btn');
+    const shuffleBtn = this.shadowRoot.querySelector('.shuffle-btn');
 
     playBtn.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('play-pause', {
@@ -124,6 +145,20 @@ class PlayerControls extends HTMLElement {
         composed: true,
       }));
     });
+
+    loopBtn.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('toggle-loop', {
+        bubbles: true,
+        composed: true,
+      }));
+    });
+
+    shuffleBtn.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('toggle-shuffle', {
+        bubbles: true,
+        composed: true,
+      }));
+    });
   }
 
   /**
@@ -138,6 +173,36 @@ class PlayerControls extends HTMLElement {
       playBtn.textContent = '⏸';
     } else {
       playBtn.textContent = '▶';
+    }
+  }
+
+  /**
+   * Update the loop button to show the correct state
+   * @param {boolean} isLooping - Whether loop is enabled
+   */
+  setLoopState(isLooping) {
+    this.isLooping = isLooping;
+    const loopBtn = this.shadowRoot.querySelector('.loop-btn');
+
+    if (isLooping) {
+      loopBtn.classList.add('active');
+    } else {
+      loopBtn.classList.remove('active');
+    }
+  }
+
+  /**
+   * Update the shuffle button to show the correct state
+   * @param {boolean} isShuffling - Whether shuffle is enabled
+   */
+  setShuffleState(isShuffling) {
+    this.isShuffling = isShuffling;
+    const shuffleBtn = this.shadowRoot.querySelector('.shuffle-btn');
+
+    if (isShuffling) {
+      shuffleBtn.classList.add('active');
+    } else {
+      shuffleBtn.classList.remove('active');
     }
   }
 }

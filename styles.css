@@ -59,8 +59,7 @@ body {
 }
 
 .left-panel {
-    width: 280px;
-    min-width: 280px;
+    min-width: 320px;
     display: flex;
     flex-direction: column;
     border-right: 1px solid #333;

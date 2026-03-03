@@ -17,9 +17,10 @@
 
 const MusicPlayerDB = (() => {
     const DB_NAME = 'music-player-db';
-    const DB_VERSION = 2;
+    const DB_VERSION = 3;
     const HANDLE_STORE = 'folder-handles';
     const METADATA_STORE = 'folder-metadata';
+    const PLAYLISTS_STORE = 'playlists';
     const HANDLE_KEY = 'lastFolder';
 
     /**
@@ -36,6 +37,9 @@ const MusicPlayerDB = (() => {
                 }
                 if (!db.objectStoreNames.contains(METADATA_STORE)) {
                     db.createObjectStore(METADATA_STORE);
+                }
+                if (!db.objectStoreNames.contains(PLAYLISTS_STORE)) {
+                    db.createObjectStore(PLAYLISTS_STORE);
                 }
             };
 
@@ -191,12 +195,237 @@ const MusicPlayerDB = (() => {
         });
     }
 
+    /**
+     * Create a new playlist
+     * @param {string} name - Playlist name
+     * @returns {Promise<string>} - Playlist ID
+     */
+    async function createPlaylist(name) {
+        const db = await open();
+        const playlistId = `playlist-${Date.now()}`;
+        const playlist = {
+            id: playlistId,
+            name,
+            createdAt: Date.now(),
+            tracks: [],
+        };
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('playlists', 'readwrite');
+            const store = tx.objectStore('playlists');
+            const req = store.put(playlist, playlistId);
+
+            req.onsuccess = () => resolve(playlistId);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Get all playlists
+     * @returns {Promise<object[]>} - Array of playlists
+     */
+    async function getPlaylists() {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('playlists', 'readonly');
+            const store = tx.objectStore('playlists');
+            const req = store.getAll();
+
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Get a specific playlist
+     * @param {string} playlistId - Playlist ID
+     * @returns {Promise<object|null>} - Playlist or null
+     */
+    async function getPlaylist(playlistId) {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('playlists', 'readonly');
+            const store = tx.objectStore('playlists');
+            const req = store.get(playlistId);
+
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Delete a playlist
+     * @param {string} playlistId - Playlist ID
+     */
+    async function deletePlaylist(playlistId) {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('playlists', 'readwrite');
+            const store = tx.objectStore('playlists');
+            const req = store.delete(playlistId);
+
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Add a track to a playlist
+     * @param {string} playlistId - Playlist ID
+     * @param {Track} track - Track to add
+     */
+    async function addTrackToPlaylist(playlistId, track) {
+        const playlist = await getPlaylist(playlistId);
+        if (!playlist) return;
+
+        // Check if track already in playlist
+        const exists = playlist.tracks.some(t => t.fileName === track.file.name);
+        if (exists) return;
+
+        // Add track
+        playlist.tracks.push({
+            fileName: track.file.name,
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            track: track.track,
+            year: track.year,
+            duration: track.duration,
+        });
+
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('playlists', 'readwrite');
+            const store = tx.objectStore('playlists');
+            const req = store.put(playlist, playlistId);
+
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Remove a track from a playlist
+     * @param {string} playlistId - Playlist ID
+     * @param {string} fileName - File name to remove
+     */
+    async function removeTrackFromPlaylist(playlistId, fileName) {
+        const playlist = await getPlaylist(playlistId);
+        if (!playlist) return;
+
+        playlist.tracks = playlist.tracks.filter(t => t.fileName !== fileName);
+
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('playlists', 'readwrite');
+            const store = tx.objectStore('playlists');
+            const req = store.put(playlist, playlistId);
+
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Add a folder handle to the list of saved handles
+     * @param {FileSystemDirectoryHandle} handle - The directory handle to add
+     */
+    async function addFolderHandle(handle) {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(HANDLE_STORE, 'readwrite');
+            const store = tx.objectStore(HANDLE_STORE);
+            const req = store.get('folderHandles');
+
+            req.onsuccess = () => {
+                const handles = req.result || [];
+                // Check if handle already exists (by name)
+                if (!handles.some(h => h.name === handle.name)) {
+                    handles.push(handle);
+                }
+                const putReq = store.put(handles, 'folderHandles');
+                putReq.onsuccess = () => resolve();
+                putReq.onerror = () => reject(putReq.error);
+            };
+
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Get all saved folder handles
+     * @returns {Promise<FileSystemDirectoryHandle[]>} - Array of folder handles
+     */
+    async function getFolderHandles() {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(HANDLE_STORE, 'readonly');
+            const store = tx.objectStore(HANDLE_STORE);
+            const req = store.get('folderHandles');
+
+            req.onsuccess = () => {
+                resolve(req.result || []);
+            };
+
+            req.onerror = () => {
+                reject(req.error);
+            };
+        });
+    }
+
+    /**
+     * Remove a folder handle by name
+     * @param {string} folderName - Name of the folder to remove
+     */
+    async function removeFolderHandle(folderName) {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(HANDLE_STORE, 'readwrite');
+            const store = tx.objectStore(HANDLE_STORE);
+            const req = store.get('folderHandles');
+
+            req.onsuccess = () => {
+                const handles = (req.result || []).filter(h => h.name !== folderName);
+                const putReq = store.put(handles, 'folderHandles');
+                putReq.onsuccess = () => resolve();
+                putReq.onerror = () => reject(putReq.error);
+            };
+
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Clear all folder handles
+     */
+    async function clearAllFolderHandles() {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(HANDLE_STORE, 'readwrite');
+            const store = tx.objectStore(HANDLE_STORE);
+            const req = store.put([], 'folderHandles');
+
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
     return {
         saveFolderHandle,
         getFolderHandle,
         clearFolderHandle,
+        addFolderHandle,
+        getFolderHandles,
+        removeFolderHandle,
+        clearAllFolderHandles,
         saveFolderMetadata,
         getFolderMetadata,
         clearFolderMetadata,
+        createPlaylist,
+        getPlaylists,
+        getPlaylist,
+        deletePlaylist,
+        addTrackToPlaylist,
+        removeTrackFromPlaylist,
     };
 })();

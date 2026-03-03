@@ -210,11 +210,11 @@ class FileSelector extends HTMLElement {
             }
 
             // Save the folder handle for later restoration
-            MusicPlayerDB.saveFolderHandle(dirHandle).catch(err => console.warn('Failed to save folder handle:', err));
+            MusicPlayerDB.addFolderHandle(dirHandle).catch(err => console.warn('Failed to add folder handle:', err));
 
             // Emit custom event with found files, tagged as from folder
             this.dispatchEvent(new CustomEvent('files-selected', {
-                detail: { files: audioFiles, fromFolder: true, folderName: dirHandle.name },
+                detail: { files: audioFiles, fromFolder: true, folderName: dirHandle.name, folderHandle: dirHandle },
                 bubbles: true,
                 composed: true,
             }));

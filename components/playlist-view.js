@@ -187,6 +187,44 @@ class PlaylistView extends HTMLElement {
                     white-space: nowrap;
                     margin-left: 1rem;
                 }
+
+                .add-playlist-btn {
+                    background: transparent;
+                    border: none;
+                    color: #888;
+                    cursor: pointer;
+                    font-size: 1.2rem;
+                    padding: 0.25rem 0.5rem;
+                    margin-left: 0.5rem;
+                    transition: color 0.2s;
+                    flex-shrink: 0;
+                }
+
+                .add-playlist-btn:hover {
+                    color: #4a9eff;
+                }
+
+                .playlist-item.unavailable {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                    color: #666;
+                }
+
+                .playlist-item.unavailable:hover {
+                    background-color: transparent;
+                }
+
+                .playlist-item.unavailable .track-label {
+                    color: #666;
+                }
+
+                .playlist-item.unavailable::after {
+                    content: ' ⚠ not available';
+                    color: #ff8888;
+                    font-size: 0.75rem;
+                    margin-left: 0.5rem;
+                    white-space: nowrap;
+                }
             </style>
 
             <div class="search-bar">
@@ -316,6 +354,11 @@ class PlaylistView extends HTMLElement {
           item.classList.add('active');
         }
 
+        // Mark unavailable tracks
+        if (track.unavailable) {
+          item.classList.add('unavailable');
+        }
+
         // Format track label: "01. Track Title" or just "Track Title"
         const trackNum = parseTrackNumber(track.track);
         const trackLabel = trackNum > 0
@@ -331,12 +374,33 @@ class PlaylistView extends HTMLElement {
         item.innerHTML = `
                     <span class="track-label">${trackLabel}</span>
                     <span class="track-meta">${trackMeta}</span>
+                    <button class="add-playlist-btn" title="Add to playlist">+</button>
                 `;
 
-        // Click handler
-        item.addEventListener('click', () => {
+        // Click handler for track selection
+        item.addEventListener('click', (e) => {
+          // Don't select if clicking the button
+          if (e.target.classList.contains('add-playlist-btn')) {
+            return;
+          }
+          // Don't select if track is unavailable
+          if (track.unavailable) {
+            alert('This track is not available. Please load the folder containing this file.');
+            return;
+          }
           this.dispatchEvent(new CustomEvent('track-selected', {
             detail: { index: originalIndex },
+            bubbles: true,
+            composed: true,
+          }));
+        });
+
+        // Click handler for add-to-playlist button
+        const addBtn = item.querySelector('.add-playlist-btn');
+        addBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.dispatchEvent(new CustomEvent('add-track-to-playlist', {
+            detail: { track, index: originalIndex },
             bubbles: true,
             composed: true,
           }));
