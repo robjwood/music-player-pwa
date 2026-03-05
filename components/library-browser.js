@@ -24,11 +24,14 @@ class LibraryBrowser extends HTMLElement {
         this.selectedArtist = null; // currently selected artist name
         this.selectedAlbum = null; // currently selected album name
         this.selectedPlaylist = null; // currently selected playlist ID
+        this.view = 'artists'; // Default view: 'artists' or 'playlists'
     }
 
     connectedCallback() {
         this.render();
         this.setupEventListeners();
+        // Initialize with artists view selected
+        this.switchView('artists');
     }
 
     /**
@@ -407,7 +410,7 @@ class LibraryBrowser extends HTMLElement {
             this.selectedPlaylist = null;
             this.renderPlaylistList();
             // Emit all tracks
-            this.emitFilterChanged(this.library);
+            this.emitFilterChanged(this.library, null);
         } else {
             // Switch to different playlist
             this.selectedPlaylist = playlist.id;
@@ -433,17 +436,18 @@ class LibraryBrowser extends HTMLElement {
                 };
             });
 
-            this.emitFilterChanged(filteredTracks);
+            this.emitFilterChanged(filteredTracks, playlist.id);
         }
     }
 
     /**
      * Emit library-filter-changed event
      * @param {Track[]} filteredTracks
+     * @param {string} playlistId - Optional playlist ID if filtering by playlist
      */
-    emitFilterChanged(filteredTracks) {
+    emitFilterChanged(filteredTracks, playlistId = null) {
         const event = new CustomEvent('library-filter-changed', {
-            detail: { tracks: filteredTracks },
+            detail: { tracks: filteredTracks, playlistId },
             bubbles: true,
             composed: true,
         });

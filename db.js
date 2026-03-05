@@ -196,6 +196,76 @@ const MusicPlayerDB = (() => {
     }
 
     /**
+     * Save a complete folder snapshot (for recovery if handle is lost)
+     * Stores folder name + full metadata together
+     * @param {string} folderName - Name of the folder
+     * @param {Track[]} tracks - Parsed track metadata
+     */
+    async function saveFolderSnapshot(folderName, tracks) {
+        const db = await open();
+        const snapshot = {
+            folderName,
+            timestamp: Date.now(),
+            trackCount: tracks.length,
+            tracks: tracks.map(t => ({
+                title: t.title,
+                artist: t.artist,
+                album: t.album,
+                track: t.track,
+                year: t.year,
+                duration: t.duration,
+                fileName: t.file.name,
+                fileSize: t.file.size,
+            }))
+        };
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(METADATA_STORE, 'readwrite');
+            const store = tx.objectStore(METADATA_STORE);
+            const req = store.put(snapshot, '__lastSnapshot__');
+
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Get the last saved folder snapshot
+     * @returns {Promise<object|null>} - Snapshot with folderName and tracks, or null
+     */
+    async function getLastFolderSnapshot() {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(METADATA_STORE, 'readonly');
+            const store = tx.objectStore(METADATA_STORE);
+            const req = store.get('__lastSnapshot__');
+
+            req.onsuccess = () => {
+                resolve(req.result || null);
+            };
+
+            req.onerror = () => {
+                reject(req.error);
+            };
+        });
+    }
+
+    /**
+     * Clear the folder snapshot
+     */
+    async function clearFolderSnapshot() {
+        const db = await open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(METADATA_STORE, 'readwrite');
+            const store = tx.objectStore(METADATA_STORE);
+            const req = store.delete('__lastSnapshot__');
+
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
      * Create a new playlist
      * @param {string} name - Playlist name
      * @returns {Promise<string>} - Playlist ID
@@ -421,6 +491,9 @@ const MusicPlayerDB = (() => {
         saveFolderMetadata,
         getFolderMetadata,
         clearFolderMetadata,
+        saveFolderSnapshot,
+        getLastFolderSnapshot,
+        clearFolderSnapshot,
         createPlaylist,
         getPlaylists,
         getPlaylist,

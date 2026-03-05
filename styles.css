@@ -47,6 +47,10 @@ body {
     font-weight: 600;
 }
 
+.folders-button {
+    display: none;
+}
+
 /* ============================================
    MAIN CONTENT
    ============================================ */
@@ -59,7 +63,7 @@ body {
 }
 
 .left-panel {
-    min-width: 320px;
+    width: 320px;
     display: flex;
     flex-direction: column;
     border-right: 1px solid #333;
@@ -120,4 +124,20 @@ button:focus,
 input:focus {
     outline: 2px solid #4a9eff;
     outline-offset: 2px;
+}
+
+/* ============================================
+   DIALOG STYLING
+   ============================================ */
+
+dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+}
+
+dialog::backdrop {
+    background-color: rgba(0, 0, 0, 0.7);
 }

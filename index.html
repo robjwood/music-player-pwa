@@ -10,7 +10,10 @@
 
 <body>
   <div class="player-container">
-    <file-selector></file-selector>
+    <!-- Header with Folders button -->
+    <header class="player-header">
+      <button id="foldersBtn" class="folders-button" title="Open folder menu (press F)">📁 Folders</button>
+    </header>
 
     <!-- Main Content Area -->
     <main class="player-main">
@@ -37,7 +40,51 @@
   </div>
 
   <!-- Hidden audio element - the actual player -->
-  <audio id="audioElement"></audio>
+  <audio id="audioElement" crossorigin="anonymous"></audio>
+
+  <!-- Loading Screen -->
+  <div id="loadingScreen" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    font-family: system-ui, -apple-system, sans-serif;
+  ">
+    <style>
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #333;
+        border-top-color: #4a9eff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 1rem;
+      }
+      .loading-text {
+        color: #e0e0e0;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+      }
+      .loading-progress {
+        color: #666;
+        font-size: 0.8rem;
+      }
+    </style>
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Music Player</div>
+    <div class="loading-progress" id="loadingProgress">Initializing...</div>
+  </div>
 
   <!-- Add to Playlist Modal -->
   <dialog id="playlistModal" style="
@@ -124,6 +171,71 @@
     <div class="modal-buttons" style="padding: 0 1rem 1rem;">
       <button type="button" class="create-btn" id="createPlaylistBtn">Create New</button>
       <button type="button" id="closePlaylistModal">Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- Folders Dialog -->
+  <dialog id="foldersDialog" style="
+    background: #252525;
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: #e0e0e0;
+    padding: 0;
+    max-width: 500px;
+  ">
+    <style>
+      #foldersDialog::backdrop {
+        background-color: rgba(0, 0, 0, 0.7);
+      }
+      #foldersDialog h2 {
+        margin: 0;
+        padding: 1rem;
+        border-bottom: 1px solid #444;
+        font-size: 1rem;
+      }
+      #foldersDialog .dialog-content {
+        padding: 1rem;
+        min-height: 150px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      #foldersDialog .dialog-buttons {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0 1rem 1rem;
+      }
+      #foldersDialog button {
+        flex: 1;
+        padding: 0.6rem;
+        background: #2a2a2a;
+        border: 1px solid #444;
+        border-radius: 4px;
+        color: #e0e0e0;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.9rem;
+      }
+      #foldersDialog button:hover {
+        background: #333;
+        border-color: #555;
+      }
+      #foldersDialog button.primary {
+        background: #4a9eff;
+        border-color: #4a9eff;
+        color: #000;
+        font-weight: 600;
+      }
+      #foldersDialog button.primary:hover {
+        background: #5aafff;
+        border-color: #5aafff;
+      }
+    </style>
+    <h2>Folder Management</h2>
+    <div class="dialog-content">
+      <file-selector></file-selector>
+    </div>
+    <div class="dialog-buttons">
+      <button type="button" id="closeFoldersDialog">Close</button>
     </div>
   </dialog>
 

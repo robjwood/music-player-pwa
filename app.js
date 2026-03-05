@@ -30,6 +30,9 @@ const playerState = {
     isShuffling: false,     // Should we shuffle the playlist?
     fromFolder: false,      // Was the playlist loaded from a folder pick?
     pendingTrack: null,     // Track waiting to be added to a playlist
+    pendingTracks: null,    // Multiple tracks waiting to be added to a playlist
+    currentPlaylistId: null,// ID of the currently selected playlist (if any)
+    sortedLibrary: [],      // Cached sorted version of full library (for fast tab switching)
 };
 
 // ============================================
@@ -125,6 +128,11 @@ async function handleFilesSelected(event) {
         audioFiles,
         (loaded, total) => {
             DOM.fileSelector.updateFileCount(`Loading metadata… ${loaded}/${total}`);
+            // Also update loading screen if visible
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen && loadingScreen.style.display !== 'none') {
+                updateLoadingProgress(`Parsing metadata… ${loaded}/${total}`);
+            }
         }
     );
 
@@ -153,10 +161,16 @@ async function handleFilesSelected(event) {
         MusicPlayerDB.saveFolderMetadata(folderName, tracks)
             .then(() => console.log('Metadata cached successfully'))
             .catch(err => console.warn('Failed to save metadata cache:', err));
+
+        // Also save a snapshot for recovery if handle is lost
+        MusicPlayerDB.saveFolderSnapshot(folderName, newTracks)
+            .then(() => console.log('Folder snapshot saved for recovery'))
+            .catch(err => console.warn('Failed to save folder snapshot:', err));
     }
 
-    // Sort tracks and create parallel playlist array
+    // Sort tracks and cache the sorted library for fast tab switching
     const sorted = sortTracksByAlbumAndNumber(playerState.library);
+    playerState.sortedLibrary = sorted;  // Cache for fast tab switches
     playerState.displayedTracks = sorted;
     playerState.originalDisplayed = [];
     playerState.isShuffling = false;
@@ -219,11 +233,30 @@ function handleClearPlaylist() {
  * Handle when the library browser filters the library
  */
 function handleLibraryFilterChanged(event) {
+    console.time('handleLibraryFilterChanged-total');
     const filteredTracks = event.detail.tracks;
+    const playlistId = event.detail.playlistId || null;
     const currentFile = playerState.playlist[playerState.currentIndex] || null;
 
-    // Sort filtered tracks and reset shuffle
-    const sorted = sortTracksByAlbumAndNumber(filteredTracks);
+    // Track the currently selected playlist
+    playerState.currentPlaylistId = playlistId;
+
+    console.time('handleLibraryFilterChanged-sort');
+    // Filter pre-sorted library for fast tab switching
+    // If viewing all tracks, use the cached sorted library
+    let sorted;
+    if (filteredTracks.length === playerState.library.length) {
+        // Viewing all tracks - use cached sorted version
+        sorted = playerState.sortedLibrary;
+    } else {
+        // Viewing a filtered subset (artist, album, or playlist)
+        // Filter the cached sorted library to maintain sort order
+        const filteredSet = new Set(filteredTracks.map(t => t.file.name));
+        sorted = playerState.sortedLibrary.filter(t => filteredSet.has(t.file.name));
+    }
+    console.timeEnd('handleLibraryFilterChanged-sort');
+
+    console.time('handleLibraryFilterChanged-state');
     playerState.displayedTracks = sorted;
     playerState.originalDisplayed = [];
     playerState.isShuffling = false;
@@ -233,9 +266,11 @@ function handleLibraryFilterChanged(event) {
     // Try to keep current track active in new view
     const newIndex = currentFile ? playerState.playlist.indexOf(currentFile) : -1;
     playerState.currentIndex = newIndex;
+    console.timeEnd('handleLibraryFilterChanged-state');
 
+    console.time('handleLibraryFilterChanged-UI');
     // Update UI components
-    DOM.playlistView.setTracks(playerState.displayedTracks);
+    DOM.playlistView.setTracks(playerState.displayedTracks, playlistId);
     if (playerState.currentIndex >= 0) {
         DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
@@ -246,6 +281,8 @@ function handleLibraryFilterChanged(event) {
         const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
         DOM.nowPlayingInfo.setTrack(currentFile, currentTrack);
     }
+    console.timeEnd('handleLibraryFilterChanged-UI');
+    console.timeEnd('handleLibraryFilterChanged-total');
 }
 
 /**
@@ -293,9 +330,22 @@ function loadAndPlayTrack() {
 
     // Set the audio source and start playing
     DOM.audio.src = fileUrl;
-    DOM.audio.play();
+    const playPromise = DOM.audio.play();
 
-    playerState.isPlaying = true;
+    if (playPromise !== undefined) {
+        playPromise
+            .then(() => {
+                playerState.isPlaying = true;
+                console.log('Audio playback started');
+            })
+            .catch(err => {
+                console.error('Playback failed:', err);
+                playerState.isPlaying = false;
+                updateAllComponents();
+            });
+    } else {
+        playerState.isPlaying = true;
+    }
 
     // Update components
     updateAllComponents();
@@ -343,8 +393,20 @@ function togglePlayPause() {
         DOM.audio.pause();
         playerState.isPlaying = false;
     } else {
-        DOM.audio.play();
-        playerState.isPlaying = true;
+        const playPromise = DOM.audio.play();
+        if (playPromise !== undefined) {
+            playPromise
+                .then(() => {
+                    playerState.isPlaying = true;
+                    console.log('Audio playback resumed');
+                })
+                .catch(err => {
+                    console.error('Playback resume failed:', err);
+                    playerState.isPlaying = false;
+                });
+        } else {
+            playerState.isPlaying = true;
+        }
     }
 
     updateAllComponents();
@@ -378,12 +440,24 @@ async function handleAddTrackToPlaylist(event) {
 }
 
 /**
- * Load playlists and show the modal
+ * Handle adding all filtered tracks to a playlist
  */
-async function loadAndShowPlaylistModal() {
+async function handleAddAllToPlaylist(event) {
+    const tracks = event.detail.tracks;
+    playerState.pendingTracks = tracks;
+
+    // Load playlists and show modal
+    await loadAndShowPlaylistModal(true);
+}
+
+/**
+ * Load playlists and show the modal
+ * @param {boolean} isMultiple - Whether adding multiple tracks (vs single track)
+ */
+async function loadAndShowPlaylistModal(isMultiple = false) {
     try {
         playerState.playlists = await MusicPlayerDB.getPlaylists();
-        showPlaylistModal();
+        showPlaylistModal(isMultiple);
     } catch (err) {
         console.warn('Failed to load playlists:', err);
         alert('Error loading playlists');
@@ -392,11 +466,22 @@ async function loadAndShowPlaylistModal() {
 
 /**
  * Show the playlist selection modal
+ * @param {boolean} isMultiple - Whether adding multiple tracks
  */
-function showPlaylistModal() {
+function showPlaylistModal(isMultiple = false) {
     const modal = document.getElementById('playlistModal');
+    const modalTitle = modal.querySelector('h2');
     const playlistList = document.getElementById('playlistList');
     const newPlaylistInput = document.getElementById('newPlaylistName');
+
+    // Update title based on single or multiple tracks
+    if (isMultiple) {
+        modalTitle.textContent = `Add ${playerState.pendingTracks?.length || 0} Tracks to Playlist`;
+        newPlaylistInput.placeholder = 'Or create new playlist for these tracks...';
+    } else {
+        modalTitle.textContent = 'Add to Playlist';
+        newPlaylistInput.placeholder = 'Or create new playlist...';
+    }
 
     // Clear previous list
     playlistList.innerHTML = '';
@@ -425,20 +510,24 @@ function showPlaylistModal() {
 }
 
 /**
- * Add the pending track to a playlist
+ * Add the pending track(s) to a playlist
  */
 async function addTrackToPlaylist(playlistId) {
-    if (!playerState.pendingTrack) return;
+    const tracksToAdd = playerState.pendingTracks || (playerState.pendingTrack ? [playerState.pendingTrack] : []);
+    if (tracksToAdd.length === 0) return;
 
     try {
-        await MusicPlayerDB.addTrackToPlaylist(playlistId, playerState.pendingTrack);
-        alert(`Added to playlist!`);
+        for (const track of tracksToAdd) {
+            await MusicPlayerDB.addTrackToPlaylist(playlistId, track);
+        }
+        alert(`Added ${tracksToAdd.length} track${tracksToAdd.length > 1 ? 's' : ''} to playlist!`);
         playerState.pendingTrack = null;
+        playerState.pendingTracks = null;
         // Reload playlists in sidebar
         await loadAndSetPlaylists();
     } catch (err) {
-        console.warn('Failed to add track to playlist:', err);
-        alert('Error adding track to playlist');
+        console.warn('Failed to add track(s) to playlist:', err);
+        alert('Error adding track(s) to playlist');
     }
 }
 
@@ -464,11 +553,67 @@ async function createAndAddPlaylist() {
 }
 
 /**
+ * Handle deleting a track from a playlist
+ */
+async function handleDeleteTrackFromPlaylist(event) {
+    if (!playerState.currentPlaylistId) {
+        console.warn('No playlist selected');
+        return;
+    }
+
+    const track = event.detail.track;
+
+    try {
+        await MusicPlayerDB.removeTrackFromPlaylist(playerState.currentPlaylistId, track.file.name);
+
+        // Reload the current playlist to reflect the deletion
+        const updatedPlaylist = await MusicPlayerDB.getPlaylist(playerState.currentPlaylistId);
+        if (updatedPlaylist) {
+            // Build updated track list
+            const updatedTracks = updatedPlaylist.tracks.map(pt => {
+                const libraryTrack = playerState.library.find(t => t.file.name === pt.fileName);
+                if (libraryTrack) {
+                    return libraryTrack;
+                }
+                return {
+                    file: { name: pt.fileName },
+                    title: pt.title,
+                    artist: pt.artist,
+                    album: pt.album,
+                    track: pt.track,
+                    year: pt.year,
+                    duration: pt.duration,
+                    unavailable: true,
+                };
+            });
+
+            // Update display and cache
+            const sorted = sortTracksByAlbumAndNumber(updatedTracks);
+            playerState.sortedLibrary = sorted;  // Cache for fast tab switching
+            playerState.displayedTracks = sorted;
+            playerState.playlist = sorted.map(t => t.file);
+            playerState.currentIndex = -1;
+
+            DOM.playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId);
+            DOM.fileSelector.updateFileCount(playerState.playlist.length);
+        }
+
+        // Reload playlists in sidebar to update track counts
+        await loadAndSetPlaylists();
+    } catch (err) {
+        console.warn('Failed to delete track from playlist:', err);
+        alert('Error removing track from playlist');
+    }
+}
+
+/**
  * Toggle shuffle mode
  */
 function toggleShuffle() {
+    console.time('toggleShuffle-total');
     playerState.isShuffling = !playerState.isShuffling;
 
+    console.time('toggleShuffle-shuffle');
     if (playerState.isShuffling) {
         // Save the original order and shuffle
         playerState.originalDisplayed = playerState.displayedTracks;
@@ -478,10 +623,14 @@ function toggleShuffle() {
         playerState.displayedTracks = playerState.originalDisplayed;
         playerState.originalDisplayed = [];
     }
+    console.timeEnd('toggleShuffle-shuffle');
 
+    console.time('toggleShuffle-updatePlaylist');
     // Update playlist File array to match the new order
     playerState.playlist = playerState.displayedTracks.map(t => t.file);
+    console.timeEnd('toggleShuffle-updatePlaylist');
 
+    console.time('toggleShuffle-findCurrent');
     // Re-find the current track in the new order
     const currentFile = DOM.audio.src ? playerState.playlist.find(f => URL.createObjectURL(f) === DOM.audio.src) : null;
     if (currentFile) {
@@ -491,13 +640,17 @@ function toggleShuffle() {
     } else {
         playerState.currentIndex = -1;
     }
+    console.timeEnd('toggleShuffle-findCurrent');
 
+    console.time('toggleShuffle-updateUI');
     // Update UI
     DOM.playerControls.setShuffleState(playerState.isShuffling);
     DOM.playlistView.setTracks(playerState.displayedTracks);
     if (playerState.currentIndex >= 0) {
         DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
+    console.timeEnd('toggleShuffle-updateUI');
+    console.timeEnd('toggleShuffle-total');
 }
 
 // ============================================
@@ -567,8 +720,8 @@ function onPlayPauseChange() {
  * Update all components to reflect the current state
  */
 function updateAllComponents() {
-    // Update playlist view
-    DOM.playlistView.setTracks(playerState.displayedTracks);
+    // Update playlist view (don't clear search - just updating which track is current)
+    DOM.playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId, false);
     if (playerState.currentIndex >= 0) {
         DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
@@ -601,7 +754,13 @@ function updateAllComponents() {
  */
 document.addEventListener('keydown', (event) => {
     // Don't respond to keyboard shortcuts if the user is typing in an input
-    if (event.target.tagName === 'INPUT' && event.target.type !== 'range') {
+    // Check both direct input elements and inputs inside Shadow DOM
+    const composedPath = event.composedPath();
+    const hasActiveInput = composedPath.some(el => {
+        return el.tagName === 'INPUT' && el.type !== 'range';
+    });
+
+    if (hasActiveInput) {
         return;
     }
 
@@ -637,6 +796,8 @@ DOM.libraryBrowser.addEventListener('library-filter-changed', handleLibraryFilte
 // Playlist events
 DOM.playlistView.addEventListener('track-selected', handleTrackSelected);
 DOM.playlistView.addEventListener('add-track-to-playlist', handleAddTrackToPlaylist);
+DOM.playlistView.addEventListener('add-all-to-playlist', handleAddAllToPlaylist);
+DOM.playlistView.addEventListener('delete-track-from-playlist', handleDeleteTrackFromPlaylist);
 
 // Playlist Modal events
 document.getElementById('closePlaylistModal').addEventListener('click', () => {
@@ -671,6 +832,14 @@ DOM.audio.addEventListener('ended', onTrackEnd);
 DOM.audio.addEventListener('play', onPlayPauseChange);
 DOM.audio.addEventListener('pause', onPlayPauseChange);
 DOM.audio.addEventListener('loadedmetadata', onTimeUpdate);
+DOM.audio.addEventListener('error', (e) => {
+    const error = DOM.audio.error;
+    console.error('Audio error:', {
+        code: error?.code,
+        message: error?.message,
+        mediaError: error
+    });
+});
 
 // ============================================
 // PERSISTENCE HELPERS
@@ -750,6 +919,11 @@ async function attemptFolderRestore() {
             });
         }
     }
+
+    // Fallback: if no folders were restored, try to recover from cached snapshot
+    if (playerState.library.length === 0) {
+        await recoverFromSnapshot();
+    }
 }
 
 /**
@@ -803,8 +977,9 @@ async function restoreFolderFromHandle(handle) {
             playerState.library.push(...newTracks);
             playerState.fromFolder = true;
 
-            // Re-sort entire library and update display
+            // Re-sort entire library and cache for fast tab switching
             const sorted = sortTracksByAlbumAndNumber(playerState.library);
+            playerState.sortedLibrary = sorted;  // Cache for fast tab switching
             playerState.displayedTracks = sorted;
             playerState.playlist = sorted.map(t => t.file);
 
@@ -844,8 +1019,9 @@ async function restoreFolderFromHandle(handle) {
         // Cache the metadata for next restore
         MusicPlayerDB.saveFolderMetadata(folderName, tracks).catch(err => console.warn('Failed to save metadata cache:', err));
 
-        // Sort entire library and create playlist
+        // Sort entire library and cache for fast tab switching
         const sorted = sortTracksByAlbumAndNumber(playerState.library);
+        playerState.sortedLibrary = sorted;  // Cache for fast tab switching
         playerState.displayedTracks = sorted;
         playerState.playlist = sorted.map(t => t.file);
         playerState.fromFolder = true;
@@ -868,24 +1044,135 @@ async function restoreFolderFromHandle(handle) {
     }
 }
 
+/**
+ * Recover from a cached snapshot when folder handles are lost
+ * Shows a recovery banner asking user to re-select the folder
+ */
+async function recoverFromSnapshot() {
+    try {
+        const snapshot = await MusicPlayerDB.getLastFolderSnapshot();
+        if (!snapshot) {
+            console.log('No folder snapshot found for recovery');
+            return;
+        }
+
+        console.log(`Found cached snapshot for folder: ${snapshot.folderName} (${snapshot.trackCount} songs)`);
+
+        // Show recovery banner
+        DOM.fileSelector.showRestoreBanner(
+            `${snapshot.folderName} (${snapshot.trackCount} songs - cached)`,
+            async () => {
+                // When user clicks, prompt them to re-select the folder
+                try {
+                    const dirHandle = await window.showDirectoryPicker();
+                    if (dirHandle) {
+                        // User selected a folder - it will be processed as files-selected
+                        // The metadata cache will be used for instant restore
+                        console.log(`User re-selected folder: ${dirHandle.name}`);
+                    }
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.warn('Failed to pick directory:', err);
+                    }
+                }
+            }
+        );
+    } catch (err) {
+        console.warn('Failed to recover from snapshot:', err);
+    }
+}
+
 // ============================================
 // INITIALIZATION
 // ============================================
 
+/**
+ * Update the loading screen progress text
+ */
+function updateLoadingProgress(text) {
+    const progressEl = document.getElementById('loadingProgress');
+    if (progressEl) {
+        progressEl.textContent = text;
+    }
+}
+
+/**
+ * Hide the loading screen
+ */
+function hideLoadingScreen() {
+    const loadingScreen = document.getElementById('loadingScreen');
+    if (loadingScreen) {
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.transition = 'opacity 0.3s ease-out';
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+        }, 300);
+    }
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
+    // Show loading screen
+    updateLoadingProgress('Initializing...');
+
     // Set default volume
     DOM.audio.volume = 1.0;
 
     // Attempt to restore folder and playlist
+    updateLoadingProgress('Loading library...');
     await attemptFolderRestore();
 
     // Load playlists (if folder restore didn't already load them)
     if (playerState.library.length === 0) {
+        updateLoadingProgress('Loading playlists...');
         await loadAndSetPlaylists();
     }
 
     // Initialize UI
+    updateLoadingProgress('Ready');
     updateAllComponents();
+
+    // Hide loading screen
+    setTimeout(() => hideLoadingScreen(), 500);
+
+    // Setup folder menu dialog
+    const foldersDialog = document.getElementById('foldersDialog');
+    const foldersBtn = document.getElementById('foldersBtn');
+    const closeFoldersBtn = document.getElementById('closeFoldersDialog');
+
+    foldersBtn.addEventListener('click', () => {
+        // Reset file count when opening dialog
+        DOM.fileSelector.updateFileCount(0);
+        foldersDialog.showModal();
+    });
+
+    closeFoldersBtn.addEventListener('click', () => {
+        foldersDialog.close();
+    });
+
+    // Close dialog when pressing Escape
+    foldersDialog.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            foldersDialog.close();
+        }
+    });
+
+    // Setup 'f' key shortcut to open/close folders dialog
+    document.addEventListener('keydown', (e) => {
+        // Only trigger if 'f' is pressed and no modifiers (ctrl, alt, shift)
+        if (e.key === 'f' && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+            // Don't trigger if typing in an input field
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                if (foldersDialog.open) {
+                    foldersDialog.close();
+                } else {
+                    // Reset file count when opening dialog
+                    DOM.fileSelector.updateFileCount(0);
+                    foldersDialog.showModal();
+                }
+            }
+        }
+    });
 
     console.log('🎵 Music Player initialized');
 });
