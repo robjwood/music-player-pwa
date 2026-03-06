@@ -25,8 +25,10 @@ class NowPlayingInfo extends HTMLElement {
   }
 
   connectedCallback() {
+    console.log('🎵 NowPlayingInfo connectedCallback - rendering');
     this.render();
     this.attachButtonListeners();
+    console.log('🎵 NowPlayingInfo rendered with buttons:', this.shadowRoot.querySelectorAll('button').length);
   }
 
   /**
@@ -158,6 +160,8 @@ class NowPlayingInfo extends HTMLElement {
    * @param {Track|null} track - Optional track metadata
    */
   setTrack(file, track = null) {
+    console.log('🎵 setTrack called with file:', file?.name, 'buttons before:', this.shadowRoot?.querySelectorAll('button').length);
+
     if (!file) {
       this.clearTrack();
       return;
@@ -165,6 +169,7 @@ class NowPlayingInfo extends HTMLElement {
 
     // Ensure shadow DOM is initialized
     if (!this.shadowRoot || this.shadowRoot.innerHTML === '') {
+      console.log('🎵 Shadow DOM missing, re-rendering');
       this.render();
       this.attachButtonListeners();
     }
@@ -196,11 +201,14 @@ class NowPlayingInfo extends HTMLElement {
    * Clear the track display
    */
   clearTrack() {
+    console.log('🎵 clearTrack called, buttons before:', this.shadowRoot?.querySelectorAll('button').length);
+
     this.currentFile = null;
     this.currentTrack = null;
 
     // Ensure shadow DOM is initialized
     if (!this.shadowRoot || this.shadowRoot.innerHTML === '') {
+      console.log('🎵 Shadow DOM missing in clearTrack, re-rendering');
       this.render();
       this.attachButtonListeners();
     }
