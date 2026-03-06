@@ -1384,3 +1384,20 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     console.log('🎵 Music Player initialized');
 });
+
+// ============================================
+// SERVICE WORKER REGISTRATION
+// ============================================
+
+// Register service worker for PWA support
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+                console.log('✓ Service Worker registered successfully');
+            })
+            .catch(err => {
+                console.warn('Service Worker registration failed:', err);
+            });
+    });
+}

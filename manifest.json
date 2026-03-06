@@ -1,0 +1,47 @@
+{
+  "name": "Music Player",
+  "short_name": "Music Player",
+  "description": "A lightweight music player with folder selection and playlist management",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#1a1a1a",
+  "theme_color": "#4a9eff",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%231a1a1a' width='192' height='192'/><text x='96' y='110' font-size='100' fill='%234a9eff' text-anchor='middle' dominant-baseline='middle' font-family='system-ui' font-weight='bold'>♪</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%234a9eff' width='512' height='512'/><text x='256' y='280' font-size='280' fill='%231a1a1a' text-anchor='middle' dominant-baseline='middle' font-family='system-ui' font-weight='bold'>♪</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%234a9eff' width='192' height='192'/><text x='96' y='110' font-size='100' fill='%231a1a1a' text-anchor='middle' dominant-baseline='middle' font-family='system-ui' font-weight='bold'>♪</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["music", "multimedia"],
+  "shortcuts": [
+    {
+      "name": "Open Music Player",
+      "short_name": "Open",
+      "description": "Open the music player",
+      "url": "/",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%234a9eff' width='96' height='96'/><text x='48' y='55' font-size='60' fill='%231a1a1a' text-anchor='middle' dominant-baseline='middle' font-family='system-ui' font-weight='bold'>♪</text></svg>",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}
