@@ -33,6 +33,7 @@ const playerState = {
     pendingTracks: null,    // Multiple tracks waiting to be added to a playlist
     currentPlaylistId: null,// ID of the currently selected playlist (if any)
     sortedLibrary: [],      // Cached sorted version of full library (for fast tab switching)
+    playbackReady: false,   // Are File objects loaded and playback available?
 };
 
 // ============================================
@@ -115,13 +116,11 @@ async function handleFilesSelected(event) {
     const audioFiles = event.detail.files;
     const folderHandle = event.detail.folderHandle;
     const folderName = event.detail.folderName;
-    const wasEmpty = playerState.playlist.length === 0;
 
-    // Mark as folder-loaded (all selections are from folders now)
-    if (wasEmpty) {
-        playerState.fromFolder = true;
-        saveLastTrackIndex(0);
-    }
+    // IMPORTANT: Clear old library when loading fresh files to remove fake snapshot objects
+    playerState.library = [];
+    playerState.fromFolder = true;
+    saveLastTrackIndex(0);
 
     // Parse metadata asynchronously
     const tracks = await MusicMetadata.parseAllMetadata(
@@ -136,9 +135,9 @@ async function handleFilesSelected(event) {
         }
     );
 
-    // Filter out duplicates (by filename) before adding
-    const existingFileNames = new Set(playerState.library.map(t => t.file.name));
-    const newTracks = tracks.filter(t => !existingFileNames.has(t.file.name));
+    // Add tracks to library (fresh start, no duplicates check needed)
+    playerState.library = tracks;
+    const newTracks = tracks;
 
     // Track how many duplicates were skipped
     const duplicateCount = tracks.length - newTracks.length;
@@ -155,17 +154,16 @@ async function handleFilesSelected(event) {
             .catch(err => console.warn('Failed to save folder handle:', err));
     }
 
-    // Cache metadata for this folder for instant restore next time
+    // Cache metadata for this folder (for faster restore if folder handle is still valid)
     if (playerState.fromFolder && folderName) {
         console.log(`Caching metadata for folder: ${folderName}`);
-        MusicPlayerDB.saveFolderMetadata(folderName, tracks)
-            .then(() => console.log('Metadata cached successfully'))
-            .catch(err => console.warn('Failed to save metadata cache:', err));
 
-        // Also save a snapshot for recovery if handle is lost
-        MusicPlayerDB.saveFolderSnapshot(folderName, newTracks)
-            .then(() => console.log('Folder snapshot saved for recovery'))
-            .catch(err => console.warn('Failed to save folder snapshot:', err));
+        try {
+            await MusicPlayerDB.saveFolderMetadata(folderName, playerState.library);
+            console.log('✓ Metadata cached successfully');
+        } catch (err) {
+            console.warn('Failed to save metadata cache:', err);
+        }
     }
 
     // Sort tracks and cache the sorted library for fast tab switching
@@ -175,6 +173,7 @@ async function handleFilesSelected(event) {
     playerState.originalDisplayed = [];
     playerState.isShuffling = false;
     playerState.playlist = sorted.map(t => t.file);
+    playerState.playbackReady = true;  // File objects are loaded, playback is ready
     DOM.playerControls.setShuffleState(false);
 
     // If this is the first file, select it
@@ -315,6 +314,16 @@ function handleTrackSelected(event) {
 function loadAndPlayTrack() {
     // Check if we have a valid track
     if (playerState.currentIndex < 0 || playerState.currentIndex >= playerState.playlist.length) {
+        console.warn('Invalid track index');
+        return;
+    }
+
+    const currentFile = playerState.playlist[playerState.currentIndex];
+
+    // Validate it's a real File object
+    if (!currentFile || !(currentFile instanceof File)) {
+        console.error('Track is not a valid File object:', currentFile);
+        alert('Error: Track file is invalid. Try reloading the folder.');
         return;
     }
 
@@ -322,8 +331,6 @@ function loadAndPlayTrack() {
     if (playerState.fromFolder) {
         saveLastTrackIndex(playerState.currentIndex);
     }
-
-    const currentFile = playerState.playlist[playerState.currentIndex];
 
     // Create a URL for the file
     const fileUrl = URL.createObjectURL(currentFile);
@@ -855,11 +862,136 @@ function saveLastTrackIndex(index) {
 }
 
 /**
+ * Load library from cached snapshot instantly (without rescanning folder)
+ */
+async function loadFromSnapshot() {
+    try {
+        const snapshot = await MusicPlayerDB.getLastFolderSnapshot();
+        if (!snapshot) {
+            console.log('No snapshot found in cache');
+            return false;
+        }
+
+        console.log(`✓ Loading from snapshot: ${snapshot.folderName} (${snapshot.trackCount} songs)`);
+
+        // Create Track objects from cached metadata
+        const tracks = snapshot.tracks.map(cached => ({
+            file: {
+                name: cached.fileName,
+                size: cached.fileSize,
+            },
+            title: cached.title,
+            artist: cached.artist,
+            album: cached.album,
+            track: cached.track,
+            year: cached.year,
+            duration: cached.duration,
+        }));
+
+        // Sort and populate library
+        playerState.library = tracks;
+        playerState.sortedLibrary = sortTracksByAlbumAndNumber(tracks);
+        playerState.displayedTracks = playerState.sortedLibrary;
+        playerState.playlist = tracks.map(t => t.file);
+        playerState.fromFolder = true;
+
+        // Set library in browser
+        DOM.libraryBrowser.setLibrary(playerState.library);
+        await loadAndSetPlaylists();
+
+        // Restore last track index
+        const savedIndex = localStorage.getItem('music-player-last-index');
+        if (savedIndex !== null) {
+            const index = parseInt(savedIndex, 10);
+            if (!isNaN(index) && index >= 0 && index < playerState.playlist.length) {
+                playerState.currentIndex = index;
+            }
+        }
+
+        return true;
+    } catch (err) {
+        console.warn('Failed to load from snapshot:', err);
+        return false;
+    }
+}
+
+/**
+ * Verify snapshot validity in the background
+ * Checks if folder still accessible and file count matches
+ */
+async function verifySnapshotInBackground() {
+    try {
+        const snapshot = await MusicPlayerDB.getLastFolderSnapshot();
+        if (!snapshot) return;
+
+        // Try to get the folder handles
+        let handles;
+        try {
+            handles = await MusicPlayerDB.getFolderHandles();
+        } catch (err) {
+            console.warn('Failed to retrieve folder handles for verification:', err);
+            return;
+        }
+
+        if (!handles || handles.length === 0) return;
+
+        // Find matching folder
+        const matchingHandle = handles.find(h => h.name === snapshot.folderName);
+        if (!matchingHandle) return;
+
+        // Check permission
+        const permission = await matchingHandle.queryPermission({ mode: 'read' });
+        if (permission !== 'granted') return;
+
+        // Quick file count check
+        let fileCount = 0;
+        try {
+            for await (const entry of matchingHandle.entries()) {
+                if (entry[1].kind === 'file') {
+                    const name = entry[0].toLowerCase();
+                    if (/\.(mp3|wav|flac|m4a|ogg|wma)$/i.test(name)) {
+                        fileCount++;
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('Failed to verify snapshot:', err);
+            return;
+        }
+
+        // If file count differs significantly, the snapshot is stale
+        const expectedCount = snapshot.trackCount;
+        const percentChange = Math.abs(fileCount - expectedCount) / expectedCount;
+
+        if (percentChange > 0.1) {
+            // More than 10% change detected, offer to rescan
+            console.warn(`Folder has changed: ${fileCount} files vs ${expectedCount} cached`);
+            DOM.fileSelector.showRestoreBanner(
+                `${snapshot.folderName} - files changed. Click to refresh.`,
+                async () => {
+                    try {
+                        await restoreFolderFromHandle(matchingHandle);
+                        updateAllComponents();
+                    } catch (err) {
+                        console.warn('Failed to refresh folder:', err);
+                    }
+                }
+            );
+        } else {
+            console.log(`✓ Snapshot verified: folder intact (${fileCount} files)`);
+        }
+    } catch (err) {
+        console.warn('Snapshot verification error:', err);
+    }
+}
+
+/**
  * Attempt to restore the folder and playlist on startup
  */
 async function attemptFolderRestore() {
     // Check if File System Access API is supported
     if (!('showDirectoryPicker' in window)) {
+        console.log('File System Access API not supported');
         return;
     }
 
@@ -867,29 +999,39 @@ async function attemptFolderRestore() {
     let handles;
     try {
         handles = await MusicPlayerDB.getFolderHandles();
+        console.log(`Found ${handles?.length || 0} saved folder handles`);
     } catch (err) {
         console.warn('Failed to retrieve folder handles from IndexedDB:', err);
         return;
     }
 
     if (!handles || handles.length === 0) {
+        console.log('No folder handles saved - user needs to select folder');
         return;
     }
 
     // Process each saved folder
     const bannersToShow = [];
+    let restoredCount = 0;
+
     for (const handle of handles) {
         try {
+            console.log(`Checking permission for folder: ${handle.name}`);
             const permission = await handle.queryPermission({ mode: 'read' });
+            console.log(`Permission for ${handle.name}: ${permission}`);
 
             if (permission === 'granted') {
                 // Permission already granted, restore silently
+                console.log(`✓ Auto-restoring folder: ${handle.name}`);
                 await restoreFolderFromHandle(handle);
+                restoredCount++;
             } else if (permission === 'prompt') {
                 // Permission needs to be re-granted, queue banner
+                console.log(`Permission prompt needed for: ${handle.name}`);
                 bannersToShow.push(handle);
             } else {
                 // Permission denied, remove this handle
+                console.log(`Permission denied for: ${handle.name}`);
                 await MusicPlayerDB.removeFolderHandle(handle.name)
                     .catch(err => console.warn('Failed to remove folder handle:', err));
             }
@@ -898,32 +1040,22 @@ async function attemptFolderRestore() {
         }
     }
 
-    // Show banners for folders that need permission
+    console.log(`Restored ${restoredCount} folder(s)`);
+    console.log(`Showing ${bannersToShow.length} permission banner(s)`);
+
+    // Show message for folders that need permission
     if (bannersToShow.length > 0) {
-        for (const handle of bannersToShow) {
-            DOM.fileSelector.showRestoreBanner(handle.name, async () => {
-                try {
-                    const result = await handle.requestPermission({ mode: 'read' });
-                    if (result === 'granted') {
-                        await restoreFolderFromHandle(handle);
-                        updateAllComponents();
-                    } else {
-                        await MusicPlayerDB.removeFolderHandle(handle.name)
-                            .catch(err => console.warn('Failed to remove folder handle:', err));
-                    }
-                } catch (err) {
-                    console.warn('Failed to request permission:', err);
-                    await MusicPlayerDB.removeFolderHandle(handle.name)
-                        .catch(err => console.warn('Failed to remove folder handle:', err));
-                }
-            });
+        const folderNames = bannersToShow.map(h => h.name).join(', ');
+        console.log(`⚠️  Permission needed for: ${folderNames}`);
+        console.log('💡 Click the Folders button (📁) and re-select your folder to restore access');
+
+        // Show a visual indicator in the app
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen && loadingScreen.style.display !== 'none') {
+            updateLoadingProgress(`Permission needed - click Folders button`);
         }
     }
 
-    // Fallback: if no folders were restored, try to recover from cached snapshot
-    if (playerState.library.length === 0) {
-        await recoverFromSnapshot();
-    }
 }
 
 /**
@@ -932,16 +1064,25 @@ async function attemptFolderRestore() {
 async function restoreFolderFromHandle(handle) {
     try {
         const folderName = handle.name;
-        console.log(`Restoring folder: ${folderName}`);
+        console.log(`🔄 Restoring folder: ${folderName}`);
+
+        // Scan directory for files
+        const audioFiles = await scanDirectory(handle);
+        console.log(`Found ${audioFiles.length} audio files in ${folderName}`);
+
+        if (audioFiles.length === 0) {
+            console.warn(`No audio files found in ${folderName}`);
+            MusicPlayerDB.clearAllFolderHandles().catch(err => console.warn('Failed to clear folder handle:', err));
+            return;
+        }
 
         // Try to load from cache first (instant restore)
         const cached = await MusicPlayerDB.getFolderMetadata(folderName);
-        console.log(`Cache lookup for "${folderName}":`, cached ? 'HIT' : 'MISS');
+        console.log(`Cache lookup for "${folderName}":`, cached ? `HIT (${cached.tracks.length} songs)` : 'MISS');
 
         if (cached) {
             console.log('Using cached metadata (scanning for File objects)');
-            // Use cached metadata, but still need to scan for File objects
-            const audioFiles = await scanDirectory(handle);
+            // audioFiles already scanned above
 
             const trackMap = {};
             cached.tracks.forEach(t => {
@@ -998,9 +1139,7 @@ async function restoreFolderFromHandle(handle) {
             return;
         }
 
-        // Cache miss or folder changed - scan and parse
-        const audioFiles = await scanDirectory(handle);
-
+        // Cache miss or folder changed - parse audio files (already scanned above)
         if (audioFiles.length === 0) {
             MusicPlayerDB.clearAllFolderHandles().catch(err => console.warn('Failed to clear folder handle:', err));
             return;
@@ -1117,19 +1256,23 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Set default volume
     DOM.audio.volume = 1.0;
 
+    // Try to load from cached snapshot first (instant, no scanning)
+    updateLoadingProgress('Loading library...');
+    const loadedFromSnapshot = await loadFromSnapshot();
+
     // Attempt to restore folder and playlist
     updateLoadingProgress('Loading library...');
     await attemptFolderRestore();
 
-    // Load playlists (if folder restore didn't already load them)
-    if (playerState.library.length === 0) {
-        updateLoadingProgress('Loading playlists...');
-        await loadAndSetPlaylists();
-    }
+    // Load playlists
+    updateLoadingProgress('Loading playlists...');
+    await loadAndSetPlaylists();
 
     // Initialize UI
-    updateLoadingProgress('Ready');
     updateAllComponents();
+
+    // Initialize UI if not already done
+    updateLoadingProgress('Ready');
 
     // Hide loading screen
     setTimeout(() => hideLoadingScreen(), 500);
