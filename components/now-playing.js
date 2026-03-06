@@ -19,6 +19,7 @@
 class NowPlayingInfo extends HTMLElement {
   constructor() {
     super();
+    console.log('NowPlayingInfo constructor() called');
     this.attachShadow({ mode: 'open' });
     this.currentFile = null;
     this.currentTrack = null;
@@ -26,9 +27,14 @@ class NowPlayingInfo extends HTMLElement {
 
   connectedCallback() {
     console.log('NowPlayingInfo connectedCallback() called');
+    console.log('shadowRoot exists:', !!this.shadowRoot);
     this.render();
+    console.log('After render - shadowRoot innerHTML length:', this.shadowRoot.innerHTML.length);
+    console.log('shadowRoot innerHTML:', this.shadowRoot.innerHTML);
     this.setupEventListeners();
-    console.log('Shadow DOM buttons:', this.shadowRoot.querySelectorAll('button'));
+    const buttons = this.shadowRoot.querySelectorAll('button');
+    console.log('Shadow DOM buttons found:', buttons.length);
+    buttons.forEach((btn, idx) => console.log(`  Button ${idx}:`, btn.textContent, btn.className));
   }
 
   setupEventListeners() {
