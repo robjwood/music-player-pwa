@@ -25,8 +25,10 @@ class NowPlayingInfo extends HTMLElement {
   }
 
   connectedCallback() {
+    console.log('NowPlayingInfo connectedCallback() called');
     this.render();
     this.setupEventListeners();
+    console.log('Shadow DOM buttons:', this.shadowRoot.querySelectorAll('button'));
   }
 
   setupEventListeners() {
@@ -67,6 +69,7 @@ class NowPlayingInfo extends HTMLElement {
    * Render the component's HTML and styles
    */
   render() {
+    console.log('NowPlayingInfo render() called');
     this.shadowRoot.innerHTML = `
             <style>
                 :host {
