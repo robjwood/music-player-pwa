@@ -34,6 +34,7 @@ const playerState = {
     currentPlaylistId: null,// ID of the currently selected playlist (if any)
     sortedLibrary: [],      // Cached sorted version of full library (for fast tab switching)
     playbackReady: false,   // Are File objects loaded and playback available?
+    lastLoadedFileName: null,  // Filename of the last loaded track (for position resumption)
 };
 
 // ============================================
@@ -120,8 +121,10 @@ async function handleFilesSelected(event) {
     // IMPORTANT: Clear old library when loading fresh files to remove fake snapshot objects
     playerState.library = [];
     playerState.fromFolder = true;
+    playerState.lastLoadedFileName = null;  // Reset track filename for position resumption
     saveLastTrackIndex(0);
     localStorage.removeItem('music-player-last-position');  // Clear old playback position
+    localStorage.removeItem('music-player-last-position-file');  // Clear old track filename
 
     // Parse metadata asynchronously
     const tracks = await MusicMetadata.parseAllMetadata(
@@ -217,6 +220,7 @@ function handleClearPlaylist() {
     playerState.currentIndex = -1;
     playerState.isPlaying = false;
     playerState.fromFolder = false;
+    playerState.lastLoadedFileName = null;  // Reset track filename for position resumption
 
     // Clear library browser
     DOM.libraryBrowser.setLibrary([]);
@@ -225,6 +229,7 @@ function handleClearPlaylist() {
     MusicPlayerDB.clearAllFolderHandles().catch(err => console.warn('Failed to clear folder handle:', err));
     localStorage.removeItem('music-player-last-index');
     localStorage.removeItem('music-player-last-position');
+    localStorage.removeItem('music-player-last-position-file');
 
     // Update the UI
     updateAllComponents();
@@ -346,7 +351,7 @@ function loadAndPlayTrack() {
             .then(() => {
                 playerState.isPlaying = true;
                 console.log('Audio playback started');
-                // Restore playback position if this is the same track
+                // Restore playback position (will check filename to ensure it's the same track)
                 restorePlaybackPosition();
             })
             .catch(err => {
@@ -356,9 +361,12 @@ function loadAndPlayTrack() {
             });
     } else {
         playerState.isPlaying = true;
-        // Restore playback position
+        // Restore playback position (will check filename to ensure it's the same track)
         restorePlaybackPosition();
     }
+
+    // Update the last loaded track filename
+    playerState.lastLoadedFileName = currentFile.name;
 
     // Update components
     updateAllComponents();
@@ -882,25 +890,33 @@ function saveLastTrackIndex(index) {
 }
 
 /**
- * Save the current playback position
+ * Save the current playback position and track filename
  */
 function savePlaybackPosition() {
     if (playerState.fromFolder && playerState.currentIndex >= 0) {
+        const currentFile = playerState.playlist[playerState.currentIndex];
         const currentTime = DOM.audio.currentTime || 0;
         localStorage.setItem('music-player-last-position', String(currentTime));
+        localStorage.setItem('music-player-last-position-file', currentFile.name);
     }
 }
 
 /**
- * Restore the last playback position
+ * Restore the last playback position (only if the filename matches)
  */
 function restorePlaybackPosition() {
-    const savedPosition = localStorage.getItem('music-player-last-position');
-    if (savedPosition) {
-        const position = parseFloat(savedPosition);
-        if (!isNaN(position) && position > 0) {
-            DOM.audio.currentTime = position;
-            console.log(`Restored playback position: ${position.toFixed(2)}s`);
+    const currentFile = playerState.playlist[playerState.currentIndex];
+    const savedFileName = localStorage.getItem('music-player-last-position-file');
+
+    // Only restore position if the saved file matches the current file
+    if (savedFileName === currentFile.name) {
+        const savedPosition = localStorage.getItem('music-player-last-position');
+        if (savedPosition) {
+            const position = parseFloat(savedPosition);
+            if (!isNaN(position) && position > 0) {
+                DOM.audio.currentTime = position;
+                console.log(`Restored playback position: ${position.toFixed(2)}s`);
+            }
         }
     }
 }
