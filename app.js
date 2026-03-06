@@ -121,6 +121,7 @@ async function handleFilesSelected(event) {
     playerState.library = [];
     playerState.fromFolder = true;
     saveLastTrackIndex(0);
+    localStorage.removeItem('music-player-last-position');  // Clear old playback position
 
     // Parse metadata asynchronously
     const tracks = await MusicMetadata.parseAllMetadata(
@@ -223,6 +224,7 @@ function handleClearPlaylist() {
     // Clear persistence (but not volume preference)
     MusicPlayerDB.clearAllFolderHandles().catch(err => console.warn('Failed to clear folder handle:', err));
     localStorage.removeItem('music-player-last-index');
+    localStorage.removeItem('music-player-last-position');
 
     // Update the UI
     updateAllComponents();
@@ -344,6 +346,8 @@ function loadAndPlayTrack() {
             .then(() => {
                 playerState.isPlaying = true;
                 console.log('Audio playback started');
+                // Restore playback position if this is the same track
+                restorePlaybackPosition();
             })
             .catch(err => {
                 console.error('Playback failed:', err);
@@ -352,6 +356,8 @@ function loadAndPlayTrack() {
             });
     } else {
         playerState.isPlaying = true;
+        // Restore playback position
+        restorePlaybackPosition();
     }
 
     // Update components
@@ -839,6 +845,14 @@ DOM.audio.addEventListener('ended', onTrackEnd);
 DOM.audio.addEventListener('play', onPlayPauseChange);
 DOM.audio.addEventListener('pause', onPlayPauseChange);
 DOM.audio.addEventListener('loadedmetadata', onTimeUpdate);
+
+// Save playback position periodically (every 5 seconds)
+DOM.audio.addEventListener('timeupdate', () => {
+    // Only save every 5 seconds to avoid excessive writes
+    if (Math.floor(DOM.audio.currentTime) % 5 === 0 && DOM.audio.currentTime > 0) {
+        savePlaybackPosition();
+    }
+});
 DOM.audio.addEventListener('error', (e) => {
     const error = DOM.audio.error;
     console.error('Audio error:', {
@@ -853,11 +867,35 @@ DOM.audio.addEventListener('error', (e) => {
 // ============================================
 
 /**
- * Save the current track index to localStorage
+ * Save the current track index and playback position to localStorage
  */
 function saveLastTrackIndex(index) {
     if (playerState.fromFolder) {
         localStorage.setItem('music-player-last-index', String(index));
+    }
+}
+
+/**
+ * Save the current playback position
+ */
+function savePlaybackPosition() {
+    if (playerState.fromFolder && playerState.currentIndex >= 0) {
+        const currentTime = DOM.audio.currentTime || 0;
+        localStorage.setItem('music-player-last-position', String(currentTime));
+    }
+}
+
+/**
+ * Restore the last playback position
+ */
+function restorePlaybackPosition() {
+    const savedPosition = localStorage.getItem('music-player-last-position');
+    if (savedPosition) {
+        const position = parseFloat(savedPosition);
+        if (!isNaN(position) && position > 0) {
+            DOM.audio.currentTime = position;
+            console.log(`Restored playback position: ${position.toFixed(2)}s`);
+        }
     }
 }
 
@@ -1297,6 +1335,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (e.key === 'Escape') {
             foldersDialog.close();
         }
+    });
+
+    // Save playback position when user leaves the page
+    window.addEventListener('beforeunload', () => {
+        savePlaybackPosition();
     });
 
     // Setup 'f' key shortcut to open/close folders dialog
