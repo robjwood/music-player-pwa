@@ -32,6 +32,7 @@ class PlaylistView extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this.tracks = [];
+    this.fullLibrary = [];  // Full library for global search (all tracks, not filtered)
     this.currentIndex = -1;
     this.searchQuery = '';
     this.playlistId = null;  // ID of current playlist (null if not viewing a playlist)
@@ -393,27 +394,34 @@ class PlaylistView extends HTMLElement {
 
   /**
    * Get the currently filtered/searched tracks
+   * When searching: searches through ALL tracks (global search)
+   * When not searching: respects library browser filters
    * @returns {Track[]} Array of tracks matching the current search
    */
   getFilteredTracks() {
-    let filtered = this.tracks.filter(t =>
-      !this.searchQuery ||
-      t.title.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-      t.artist.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-      t.album.toLowerCase().includes(this.searchQuery.toLowerCase())
-    );
+    // If searching, search through the full library (global search)
+    if (this.searchQuery) {
+      let filtered = this.fullLibrary.filter(t =>
+        t.title.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        t.artist.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        t.album.toLowerCase().includes(this.searchQuery.toLowerCase())
+      );
 
-    // Apply search artist filter if selected
-    if (this.searchSelectedArtist) {
-      filtered = filtered.filter(t => t.artist === this.searchSelectedArtist);
+      // Apply search artist filter if selected (within search results)
+      if (this.searchSelectedArtist) {
+        filtered = filtered.filter(t => t.artist === this.searchSelectedArtist);
+      }
+
+      // Apply search album filter if selected (within search results)
+      if (this.searchSelectedAlbum) {
+        filtered = filtered.filter(t => t.album === this.searchSelectedAlbum);
+      }
+
+      return filtered;
     }
 
-    // Apply search album filter if selected
-    if (this.searchSelectedAlbum) {
-      filtered = filtered.filter(t => t.album === this.searchSelectedAlbum);
-    }
-
-    return filtered;
+    // If not searching, use the current filtered tracks (from library browser)
+    return this.tracks;
   }
 
   /**
@@ -475,12 +483,14 @@ class PlaylistView extends HTMLElement {
 
   /**
    * Set the tracks to display (Track[] with metadata)
-   * @param {Track[]} tracks - Array of Track objects (already sorted)
+   * @param {Track[]} tracks - Array of Track objects (already sorted, may be filtered by library browser)
    * @param {string} playlistId - Optional playlist ID if viewing a playlist
    * @param {boolean} clearSearch - Whether to clear the search (default: true for new filters, false for just updating current track)
+   * @param {Track[]} fullLibrary - Optional full library for global search (if not provided, uses tracks)
    */
-  setTracks(tracks, playlistId = null, clearSearch = true) {
+  setTracks(tracks, playlistId = null, clearSearch = true, fullLibrary = null) {
     this.tracks = tracks;
+    this.fullLibrary = fullLibrary || tracks;  // Use provided full library, or fall back to current tracks
     this.playlistId = playlistId;
 
     if (clearSearch) {

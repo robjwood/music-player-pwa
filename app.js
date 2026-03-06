@@ -191,8 +191,8 @@ async function handleFilesSelected(event) {
     // Load and set playlists
     await loadAndSetPlaylists();
 
-    // Update the UI
-    DOM.playlistView.setTracks(playerState.displayedTracks);
+    // Update the UI with full library for global search
+    DOM.playlistView.setTracks(playerState.displayedTracks, null, true, playerState.sortedLibrary);
     DOM.fileSelector.updateFileCount(playerState.playlist.length);
     DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     DOM.playerControls.setPlayState(playerState.isPlaying);
@@ -275,8 +275,8 @@ function handleLibraryFilterChanged(event) {
     console.timeEnd('handleLibraryFilterChanged-state');
 
     console.time('handleLibraryFilterChanged-UI');
-    // Update UI components
-    DOM.playlistView.setTracks(playerState.displayedTracks, playlistId);
+    // Update UI components with full library for global search
+    DOM.playlistView.setTracks(playerState.displayedTracks, playlistId, true, playerState.sortedLibrary);
     if (playerState.currentIndex >= 0) {
         DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
@@ -621,7 +621,7 @@ async function handleDeleteTrackFromPlaylist(event) {
             playerState.playlist = sorted.map(t => t.file);
             playerState.currentIndex = -1;
 
-            DOM.playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId);
+            DOM.playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId, true, playerState.sortedLibrary);
             DOM.fileSelector.updateFileCount(playerState.playlist.length);
         }
 
@@ -670,9 +670,9 @@ function toggleShuffle() {
     console.timeEnd('toggleShuffle-findCurrent');
 
     console.time('toggleShuffle-updateUI');
-    // Update UI
+    // Update UI with full library for global search
     DOM.playerControls.setShuffleState(playerState.isShuffling);
-    DOM.playlistView.setTracks(playerState.displayedTracks);
+    DOM.playlistView.setTracks(playerState.displayedTracks, null, true, playerState.sortedLibrary);
     if (playerState.currentIndex >= 0) {
         DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
@@ -748,7 +748,8 @@ function onPlayPauseChange() {
  */
 function updateAllComponents() {
     // Update playlist view (don't clear search - just updating which track is current)
-    DOM.playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId, false);
+    // Pass full sorted library for global search capability
+    DOM.playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId, false, playerState.sortedLibrary);
     if (playerState.currentIndex >= 0) {
         DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
