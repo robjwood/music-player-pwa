@@ -401,6 +401,12 @@ function togglePlayPause() {
         return;
     }
 
+    // If a track is selected but no audio source is loaded, load it now
+    if (!DOM.audio.src && playerState.currentIndex >= 0) {
+        loadAndPlayTrack();
+        return;
+    }
+
     // Toggle play/pause
     if (playerState.isPlaying) {
         DOM.audio.pause();
