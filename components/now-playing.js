@@ -2,9 +2,14 @@
  * NOW PLAYING COMPONENT
  *
  * Displays the currently playing track title and artist from metadata or filename
+ * Includes buttons to add track to playlists
  *
  * Usage:
  *   <now-playing-info></now-playing-info>
+ *
+ * Events emitted:
+ *   - add-to-liked: {} - Add current track to "Liked" playlist
+ *   - add-to-playlist: { detail: { track } } - Add current track to any playlist
  *
  * Methods:
  *   setTrack(file, track) - Update the displayed track (track metadata optional)
@@ -15,10 +20,47 @@ class NowPlayingInfo extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    this.currentFile = null;
+    this.currentTrack = null;
   }
 
   connectedCallback() {
     this.render();
+    this.setupEventListeners();
+  }
+
+  setupEventListeners() {
+    const likeBtn = this.shadowRoot.querySelector('.like-btn');
+    const addBtn = this.shadowRoot.querySelector('.add-btn');
+
+    if (likeBtn) {
+      likeBtn.addEventListener('click', () => {
+        if (this.currentFile && this.currentTrack) {
+          this.dispatchEvent(new CustomEvent('add-to-liked', {
+            detail: { track: this.currentTrack },
+            bubbles: true,
+            composed: true
+          }));
+          // Visual feedback: briefly change star color
+          likeBtn.style.color = '#4a9eff';
+          setTimeout(() => {
+            likeBtn.style.color = '';
+          }, 300);
+        }
+      });
+    }
+
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        if (this.currentFile && this.currentTrack) {
+          this.dispatchEvent(new CustomEvent('add-to-playlist', {
+            detail: { track: this.currentTrack },
+            bubbles: true,
+            composed: true
+          }));
+        }
+      });
+    }
   }
 
   /**
@@ -30,6 +72,18 @@ class NowPlayingInfo extends HTMLElement {
                 :host {
                     display: block;
                     margin-bottom: 1rem;
+                }
+
+                .track-info {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    gap: 0.5rem;
+                }
+
+                .track-text {
+                    flex: 1;
+                    min-width: 0;
                 }
 
                 .track-title {
@@ -49,10 +103,42 @@ class NowPlayingInfo extends HTMLElement {
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
+
+                .track-buttons {
+                    display: flex;
+                    gap: 0.4rem;
+                    flex-shrink: 0;
+                }
+
+                .like-btn, .add-btn {
+                    background: none;
+                    border: none;
+                    color: #888;
+                    font-size: 1.2rem;
+                    cursor: pointer;
+                    padding: 0.2rem 0.4rem;
+                    transition: color 0.2s;
+                }
+
+                .like-btn:hover, .add-btn:hover {
+                    color: #e0e0e0;
+                }
+
+                .like-btn:active, .add-btn:active {
+                    color: #4a9eff;
+                }
             </style>
 
-            <div class="track-title">No track selected</div>
-            <div class="track-artist">Select a file to start</div>
+            <div class="track-info">
+                <div class="track-text">
+                    <div class="track-title">No track selected</div>
+                    <div class="track-artist">Select a file to start</div>
+                </div>
+                <div class="track-buttons">
+                    <button class="like-btn" title="Add to Liked playlist (★)">★</button>
+                    <button class="add-btn" title="Add to playlist (+)">+</button>
+                </div>
+            </div>
         `;
   }
 
@@ -66,6 +152,18 @@ class NowPlayingInfo extends HTMLElement {
       this.clearTrack();
       return;
     }
+
+    // Store current track for button actions
+    this.currentFile = file;
+    this.currentTrack = track || {
+      file,
+      title: file.name.replace(/\.[^/.]+$/, ''),
+      artist: 'Unknown Artist',
+      album: 'Unknown Album',
+      track: '',
+      year: '',
+      duration: 0
+    };
 
     const titleEl = this.shadowRoot.querySelector('.track-title');
     const artistEl = this.shadowRoot.querySelector('.track-artist');
@@ -82,6 +180,9 @@ class NowPlayingInfo extends HTMLElement {
    * Clear the track display
    */
   clearTrack() {
+    this.currentFile = null;
+    this.currentTrack = null;
+
     const titleEl = this.shadowRoot.querySelector('.track-title');
     const artistEl = this.shadowRoot.querySelector('.track-artist');
 

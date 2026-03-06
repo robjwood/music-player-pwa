@@ -297,6 +297,17 @@ function handleLibraryFilterChanged(event) {
 async function loadAndSetPlaylists() {
     try {
         const playlists = await MusicPlayerDB.getPlaylists();
+
+        // Ensure "Liked" playlist exists
+        const hasLiked = playlists.some(p => p.name === '♥ Liked');
+        if (!hasLiked) {
+            await getOrCreateLikedPlaylist();
+            // Reload to include the newly created Liked playlist
+            const updatedPlaylists = await MusicPlayerDB.getPlaylists();
+            DOM.libraryBrowser.setPlaylists(updatedPlaylists);
+            return;
+        }
+
         DOM.libraryBrowser.setPlaylists(playlists);
     } catch (err) {
         console.warn('Failed to load playlists:', err);
@@ -475,6 +486,52 @@ async function handleAddAllToPlaylist(event) {
 
     // Load playlists and show modal
     await loadAndShowPlaylistModal(true);
+}
+
+/**
+ * Handle adding current track to the "Liked" playlist
+ */
+async function handleAddToLiked(event) {
+    const track = event.detail.track;
+
+    try {
+        // Get or create the "Liked" playlist
+        const likedPlaylist = await getOrCreateLikedPlaylist();
+
+        // Add track to the playlist
+        await MusicPlayerDB.addTrackToPlaylist(likedPlaylist.id, track);
+        console.log(`✓ Added "${track.title}" to Liked playlist`);
+
+        // Show brief notification
+        alert(`Added to Liked playlist! ♥`);
+
+        // Reload playlists in sidebar
+        await loadAndSetPlaylists();
+    } catch (err) {
+        console.warn('Failed to add track to Liked playlist:', err);
+        alert('Error adding to Liked playlist');
+    }
+}
+
+/**
+ * Get the "Liked" playlist, creating it if it doesn't exist
+ */
+async function getOrCreateLikedPlaylist() {
+    try {
+        const playlists = await MusicPlayerDB.getPlaylists();
+        let likedPlaylist = playlists.find(p => p.name === '♥ Liked');
+
+        if (!likedPlaylist) {
+            // Create the Liked playlist if it doesn't exist
+            const playlistId = await MusicPlayerDB.createPlaylist('♥ Liked');
+            likedPlaylist = await MusicPlayerDB.getPlaylist(playlistId);
+        }
+
+        return likedPlaylist;
+    } catch (err) {
+        console.error('Failed to get/create Liked playlist:', err);
+        throw err;
+    }
 }
 
 /**
@@ -826,6 +883,10 @@ DOM.playlistView.addEventListener('track-selected', handleTrackSelected);
 DOM.playlistView.addEventListener('add-track-to-playlist', handleAddTrackToPlaylist);
 DOM.playlistView.addEventListener('add-all-to-playlist', handleAddAllToPlaylist);
 DOM.playlistView.addEventListener('delete-track-from-playlist', handleDeleteTrackFromPlaylist);
+
+// Now playing events (add to playlist from player)
+DOM.nowPlayingInfo.addEventListener('add-to-liked', handleAddToLiked);
+DOM.nowPlayingInfo.addEventListener('add-to-playlist', handleAddTrackToPlaylist);
 
 // Playlist Modal events
 document.getElementById('closePlaylistModal').addEventListener('click', () => {
