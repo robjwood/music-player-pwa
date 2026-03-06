@@ -106,26 +106,40 @@ class NowPlayingInfo extends HTMLElement {
 
                 .track-buttons {
                     display: flex;
-                    gap: 0.4rem;
+                    gap: 0.5rem;
                     flex-shrink: 0;
+                    align-items: center;
+                    margin-left: 0.5rem;
                 }
 
                 .like-btn, .add-btn {
-                    background: none;
-                    border: none;
+                    background: #2a2a2a;
+                    border: 1px solid #444;
                     color: #888;
-                    font-size: 1.2rem;
+                    font-size: 1rem;
                     cursor: pointer;
-                    padding: 0.2rem 0.4rem;
-                    transition: color 0.2s;
+                    padding: 0.4rem 0.6rem;
+                    border-radius: 4px;
+                    transition: all 0.2s;
+                    min-width: 36px;
+                    text-align: center;
                 }
 
-                .like-btn:hover, .add-btn:hover {
-                    color: #e0e0e0;
+                .like-btn:hover {
+                    background: #333;
+                    border-color: #666;
+                    color: #e74c3c;
+                }
+
+                .add-btn:hover {
+                    background: #333;
+                    border-color: #666;
+                    color: #4a9eff;
                 }
 
                 .like-btn:active, .add-btn:active {
-                    color: #4a9eff;
+                    background: #1a1a1a;
+                    border-color: #4a9eff;
                 }
             </style>
 
