@@ -163,6 +163,12 @@ class NowPlayingInfo extends HTMLElement {
       return;
     }
 
+    // Ensure shadow DOM is initialized
+    if (!this.shadowRoot || this.shadowRoot.innerHTML === '') {
+      this.render();
+      this.attachButtonListeners();
+    }
+
     this.currentFile = file;
     this.currentTrack = track || {
       file,
@@ -192,6 +198,12 @@ class NowPlayingInfo extends HTMLElement {
   clearTrack() {
     this.currentFile = null;
     this.currentTrack = null;
+
+    // Ensure shadow DOM is initialized
+    if (!this.shadowRoot || this.shadowRoot.innerHTML === '') {
+      this.render();
+      this.attachButtonListeners();
+    }
 
     const titleEl = this.shadowRoot.querySelector('.track-title');
     const artistEl = this.shadowRoot.querySelector('.track-artist');
