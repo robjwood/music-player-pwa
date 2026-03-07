@@ -691,6 +691,38 @@ async function handleDeleteTrackFromPlaylist(event) {
 }
 
 /**
+ * Handle deleting a playlist
+ */
+async function handleDeletePlaylist(event) {
+    const playlistId = event.detail.playlistId;
+
+    // Confirm deletion
+    const playlistName = playerState.playlists.find(p => p.id === playlistId)?.name;
+    if (!confirm(`Delete playlist "${playlistName}"? This cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        await MusicPlayerDB.deletePlaylist(playlistId);
+        console.log(`✓ Deleted playlist: ${playlistName}`);
+
+        // If the deleted playlist was selected, deselect it
+        if (playerState.currentPlaylistId === playlistId) {
+            playerState.currentPlaylistId = null;
+            playerState.displayedTracks = playerState.sortedLibrary;
+            playerState.playlist = playerState.displayedTracks.map(t => t.file);
+            updateAllComponents();
+        }
+
+        // Reload playlists in sidebar
+        await loadAndSetPlaylists();
+    } catch (err) {
+        console.warn('Failed to delete playlist:', err);
+        alert('Error deleting playlist');
+    }
+}
+
+/**
  * Toggle shuffle mode
  */
 function toggleShuffle() {
@@ -877,6 +909,7 @@ DOM.fileSelector.addEventListener('clear-playlist', handleClearPlaylist);
 
 // Library browser events
 DOM.libraryBrowser.addEventListener('library-filter-changed', handleLibraryFilterChanged);
+DOM.libraryBrowser.addEventListener('delete-playlist', handleDeletePlaylist);
 
 // Playlist events
 DOM.playlistView.addEventListener('track-selected', handleTrackSelected);

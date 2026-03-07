@@ -382,20 +382,51 @@ class LibraryBrowser extends HTMLElement {
         this.playlists.forEach((playlist, idx) => {
             const trackCount = playlist.tracks ? playlist.tracks.length : 0;
             html += `<div class="entity-item ${this.selectedPlaylist === playlist.id ? 'active' : ''}" data-playlist="${idx}">
-                ${this.escapeHtml(playlist.name)}
-                <span style="color: #666; font-size: 0.75rem; margin-left: 0.5rem;">(${trackCount})</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span>
+                        ${this.escapeHtml(playlist.name)}
+                        <span style="color: #666; font-size: 0.75rem; margin-left: 0.5rem;">(${trackCount})</span>
+                    </span>
+                    <button class="delete-playlist-btn" data-playlist-id="${playlist.id}" title="Delete playlist" style="background: none; border: none; color: #666; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem;">✕</button>
+                </div>
             </div>`;
         });
 
         listContainer.innerHTML = html;
 
-        // Add event listeners
+        // Add event listeners for playlist selection
         const playlistItems = listContainer.querySelectorAll('.entity-item');
         playlistItems.forEach((item) => {
-            item.addEventListener('click', () => {
+            // Click on item to select (but not on delete button)
+            item.addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-playlist-btn')) {
+                    return; // Let delete button handler take over
+                }
                 const playlistIdx = parseInt(item.dataset.playlist, 10);
                 const playlist = this.playlists[playlistIdx];
                 this.selectPlaylist(playlist);
+            });
+        });
+
+        // Add event listeners for delete buttons
+        const deleteButtons = listContainer.querySelectorAll('.delete-playlist-btn');
+        deleteButtons.forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const playlistId = btn.dataset.playlistId;
+                this.dispatchEvent(new CustomEvent('delete-playlist', {
+                    detail: { playlistId },
+                    bubbles: true,
+                    composed: true
+                }));
+            });
+
+            // Hover effect for delete button
+            btn.addEventListener('mouseenter', () => {
+                btn.style.color = '#e74c3c';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.color = '#666';
             });
         });
     }
