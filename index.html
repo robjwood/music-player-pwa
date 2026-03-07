@@ -23,7 +23,17 @@
     <main class="player-main">
       <!-- Left Panel: File Selector + Library Browser -->
       <div class="left-panel">
-        <library-browser></library-browser>
+        <div id="libraryBrowser" class="library-browser">
+          <div style="display: flex; border-bottom: 1px solid #333;">
+            <div class="library-header" style="flex: 1; border: none; border-bottom: 2px solid transparent; margin: 0; padding: 0.6rem 1rem;" data-view="artists">
+              Artist / Album
+            </div>
+            <div class="library-header" style="flex: 1; border: none; border-bottom: 2px solid transparent; margin: 0; padding: 0.6rem 1rem;" data-view="playlists">
+              Playlists
+            </div>
+          </div>
+          <div class="entity-list"></div>
+        </div>
       </div>
 
       <!-- Right Panel: Playlist View -->
