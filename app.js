@@ -473,14 +473,8 @@ function toggleLoop() {
  * Handle adding a track to a playlist
  */
 async function handleAddTrackToPlaylist(event) {
-    console.log('[App] handleAddTrackToPlaylist called with event:', event);
     const track = event.detail?.track;
-    console.log('[App] Track from event:', track);
-
-    if (!track) {
-        console.warn('[App] No track in event detail');
-        return;
-    }
+    if (!track) return;
 
     playerState.pendingTrack = track;
 
@@ -503,14 +497,8 @@ async function handleAddAllToPlaylist(event) {
  * Handle adding current track to the "Liked" playlist
  */
 async function handleAddToLiked(event) {
-    console.log('[App] handleAddToLiked called with event:', event);
     const track = event.detail?.track;
-    console.log('[App] Track from event:', track);
-
-    if (!track) {
-        console.warn('[App] No track in event detail');
-        return;
-    }
+    if (!track) return;
 
     try {
         // Get or create the "Liked" playlist
@@ -941,27 +929,8 @@ DOM.nowPlayingInfo.addEventListener('scroll-to-track', () => {
     DOM.playlistView.scrollCurrentTrackIntoView();
 });
 
-// Now playing buttons in footer
-const likeTrackBtn = document.getElementById('likeTrackBtn');
-const addTrackBtn = document.getElementById('addTrackBtn');
-
-likeTrackBtn.addEventListener('click', () => {
-    if (playerState.currentIndex >= 0 && playerState.displayedTracks[playerState.currentIndex]) {
-        const event = new CustomEvent('add-to-liked', {
-            detail: { track: playerState.displayedTracks[playerState.currentIndex] }
-        });
-        DOM.nowPlayingInfoContainer.dispatchEvent(event);
-    }
-});
-
-addTrackBtn.addEventListener('click', () => {
-    if (playerState.currentIndex >= 0 && playerState.displayedTracks[playerState.currentIndex]) {
-        const event = new CustomEvent('add-to-playlist', {
-            detail: { track: playerState.displayedTracks[playerState.currentIndex] }
-        });
-        DOM.nowPlayingInfoContainer.dispatchEvent(event);
-    }
-});
+// Now playing buttons are handled by the <now-playing-info> Web Component
+// The Web Component dispatches add-to-liked and add-to-playlist events when clicked
 
 // Listen for these events on the app level
 document.addEventListener('add-to-liked', handleAddToLiked);
