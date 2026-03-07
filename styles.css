@@ -158,6 +158,32 @@ input:focus {
 }
 
 /* ============================================
+   NOW PLAYING INFO
+   ============================================ */
+
+#nowPlayingInfo {
+    display: block;
+    margin-bottom: 1rem;
+    cursor: pointer;
+}
+
+.now-playing-info .track-title {
+    font-weight: 600;
+    color: #e0e0e0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.now-playing-info .track-artist {
+    font-size: 0.9rem;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ============================================
    PLAYER CONTROLS
    ============================================ */
 

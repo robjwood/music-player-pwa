@@ -34,7 +34,10 @@
     <footer class="player-footer">
       <!-- Now Playing Info with Action Buttons -->
       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 1rem;">
-        <now-playing-info></now-playing-info>
+        <div id="nowPlayingInfo" class="now-playing-info">
+          <div class="track-title" title="Click to scroll to track in playlist">No track selected</div>
+          <div class="track-artist">Select a file to start</div>
+        </div>
         <div style="display: flex; gap: 0.4rem; flex-shrink: 0;">
           <button id="likeTrackBtn" class="now-playing-btn" title="Add to Liked playlist" style="display: none;">★</button>
           <button id="addTrackBtn" class="now-playing-btn" title="Add to playlist" style="display: none;">+</button>

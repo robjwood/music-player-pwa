@@ -1,44 +1,33 @@
 /**
  * NOW PLAYING INFO COMPONENT
  *
- * Simple component that displays the currently playing track title and artist.
- * Buttons are in the HTML and enhanced with event listeners.
+ * Displays the currently playing track title and artist.
+ * HTML is defined in index.html; this class enhances it with interactivity.
  *
  * Usage:
- *   <now-playing-info></now-playing-info>
+ *   const nowPlayingInfo = new NowPlayingInfo(document.querySelector('#nowPlayingInfo'));
+ *
+ * Events emitted:
+ *   - scroll-to-track: {} - Emitted when user clicks on track info
  *
  * Methods:
  *   setTrack(file, track) - Update the displayed track
  *   clearTrack() - Clear the display
  */
 
-class NowPlayingInfo extends HTMLElement {
-  constructor() {
-    super();
+class NowPlayingInfo {
+  constructor(container) {
+    this.container = container;
     this.currentTrack = null;
-  }
 
-  connectedCallback() {
-    this.render();
-  }
-
-  /**
-   * Render initial HTML
-   */
-  render() {
-    this.innerHTML = `
-      <div class="track-title" title="Click to scroll to track in playlist">No track selected</div>
-      <div class="track-artist">Select a file to start</div>
-    `;
-
-    this.style.display = 'block';
-    this.style.marginBottom = '1rem';
-    this.style.cursor = 'pointer';
+    // Cache DOM elements
+    this.titleEl = this.container.querySelector('.track-title');
+    this.artistEl = this.container.querySelector('.track-artist');
 
     // Add click handler to scroll to track
-    this.addEventListener('click', () => {
+    this.container.addEventListener('click', () => {
       if (this.currentTrack) {
-        this.dispatchEvent(new CustomEvent('scroll-to-track', {
+        this.container.dispatchEvent(new CustomEvent('scroll-to-track', {
           bubbles: true,
           composed: true
         }));
@@ -67,16 +56,11 @@ class NowPlayingInfo extends HTMLElement {
       duration: 0
     };
 
-    const titleEl = this.querySelector('.track-title');
-    const artistEl = this.querySelector('.track-artist');
+    const title = track?.title || file.name.replace(/\.[^/.]+$/, '');
+    const artist = track?.artist || 'Unknown Artist';
 
-    if (titleEl && artistEl) {
-      const title = track?.title || file.name.replace(/\.[^/.]+$/, '');
-      const artist = track?.artist || 'Unknown Artist';
-
-      titleEl.textContent = title;
-      artistEl.textContent = artist;
-    }
+    this.titleEl.textContent = title;
+    this.artistEl.textContent = artist;
   }
 
   /**
@@ -85,15 +69,7 @@ class NowPlayingInfo extends HTMLElement {
   clearTrack() {
     this.currentTrack = null;
 
-    const titleEl = this.querySelector('.track-title');
-    const artistEl = this.querySelector('.track-artist');
-
-    if (titleEl && artistEl) {
-      titleEl.textContent = 'No track selected';
-      artistEl.textContent = 'Select a file to start';
-    }
+    this.titleEl.textContent = 'No track selected';
+    this.artistEl.textContent = 'Select a file to start';
   }
 }
-
-// Register the custom element
-customElements.define('now-playing-info', NowPlayingInfo);
