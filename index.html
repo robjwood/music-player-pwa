@@ -26,8 +26,20 @@
         <library-browser></library-browser>
       </div>
 
-      <!-- Right Panel: Playlist Component -->
-      <playlist-view></playlist-view>
+      <!-- Right Panel: Playlist View -->
+      <div id="playlistView" class="playlist-view">
+        <div class="search-bar">
+          <input
+            class="search-input"
+            type="text"
+            placeholder="Search tracks…"
+            aria-label="Search tracks"
+          >
+          <button class="add-all-btn" style="display: none;" title="Add all filtered tracks to playlist">Add All</button>
+          <button class="search-clear" aria-label="Clear search">✕</button>
+        </div>
+        <div class="playlist"></div>
+      </div>
     </main>
 
     <!-- Player Controls (Bottom) -->
