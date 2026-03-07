@@ -36,6 +36,11 @@ class NowPlayingInfo extends HTMLElement {
     this.likeBtn = this.querySelector('#likeTrackBtn');
     this.addBtn = this.querySelector('#addTrackBtn');
 
+    console.log('[NowPlayingInfo] Connected. Buttons found:', {
+      like: !!this.likeBtn,
+      add: !!this.addBtn
+    });
+
     // Add click handler to info area to scroll to track
     this.addEventListener('click', (e) => {
       // Only trigger on info area, not button clicks
@@ -50,29 +55,41 @@ class NowPlayingInfo extends HTMLElement {
     // Add like button handler
     if (this.likeBtn) {
       this.likeBtn.addEventListener('click', (e) => {
+        console.log('[NowPlayingInfo] Like button clicked');
         e.stopPropagation();
         if (this.currentTrack) {
+          console.log('[NowPlayingInfo] Dispatching add-to-liked event', this.currentTrack);
           this.dispatchEvent(new CustomEvent('add-to-liked', {
             detail: { track: this.currentTrack },
             bubbles: true,
             composed: true
           }));
+        } else {
+          console.log('[NowPlayingInfo] No current track to add to liked');
         }
       });
+    } else {
+      console.log('[NowPlayingInfo] Like button not found!');
     }
 
     // Add to playlist button handler
     if (this.addBtn) {
       this.addBtn.addEventListener('click', (e) => {
+        console.log('[NowPlayingInfo] Add button clicked');
         e.stopPropagation();
         if (this.currentTrack) {
+          console.log('[NowPlayingInfo] Dispatching add-to-playlist event', this.currentTrack);
           this.dispatchEvent(new CustomEvent('add-to-playlist', {
             detail: { track: this.currentTrack },
             bubbles: true,
             composed: true
           }));
+        } else {
+          console.log('[NowPlayingInfo] No current track to add to playlist');
         }
       });
+    } else {
+      console.log('[NowPlayingInfo] Add button not found!');
     }
   }
 
