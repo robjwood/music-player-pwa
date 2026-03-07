@@ -1,29 +1,41 @@
 /**
  * PROGRESS BAR COMPONENT
  *
- * Manages playback progress display and seeking.
- * HTML is defined in index.html; this class enhances it with interactivity.
+ * Web Component that enhances HTML seek bar with interactivity.
+ * HTML structure (progress bar, time display) is defined in index.html.
+ * This component wraps that HTML and adds event handling and state management.
  *
- * Usage:
- *   const progressBar = new ProgressBar(document.querySelector('#progressBar'));
+ * Usage in HTML:
+ *   <progress-bar class="progress-bar-container">
+ *     <div class="progress-bar">
+ *       <div class="progress-fill"></div>
+ *       <input type="range" class="seek-bar" min="0" max="100" value="0">
+ *     </div>
+ *     <div class="time-display">
+ *       <span class="current-time">0:00</span>
+ *       <span class="duration">0:00</span>
+ *     </div>
+ *   </progress-bar>
  *
  * Events emitted:
- *   - seek: { detail: { time: seconds } }
+ *   - seek: { detail: { time: seconds } } - When user seeks
  *
  * Methods:
  *   updateProgress(currentTime, duration) - Update the progress display
  */
 
-class ProgressBar {
-  constructor(container) {
-    this.container = container;
+class ProgressBar extends HTMLElement {
+  constructor() {
+    super();
     this.isDragging = false;
+  }
 
+  connectedCallback() {
     // Cache DOM elements
-    this.progressFill = this.container.querySelector('.progress-fill');
-    this.seekBar = this.container.querySelector('.seek-bar');
-    this.currentTimeEl = this.container.querySelector('.current-time');
-    this.durationEl = this.container.querySelector('.duration');
+    this.progressFill = this.querySelector('.progress-fill');
+    this.seekBar = this.querySelector('.seek-bar');
+    this.currentTimeEl = this.querySelector('.current-time');
+    this.durationEl = this.querySelector('.duration');
 
     this.setupEventListeners();
   }
@@ -32,6 +44,8 @@ class ProgressBar {
    * Set up event listeners for user interaction
    */
   setupEventListeners() {
+    if (!this.seekBar) return;
+
     this.seekBar.addEventListener('mousedown', () => {
       this.isDragging = true;
     });
@@ -61,10 +75,11 @@ class ProgressBar {
    * Handle when the user seeks
    */
   handleSeek() {
+    if (!this.seekBar) return;
     const newTime = parseFloat(this.seekBar.value);
 
     // Emit custom event so the app can seek the audio
-    this.container.dispatchEvent(new CustomEvent('seek', {
+    this.dispatchEvent(new CustomEvent('seek', {
       detail: { time: newTime },
       bubbles: true,
       composed: true,
@@ -81,14 +96,20 @@ class ProgressBar {
     const progressPercent = (currentTime / duration) * 100;
 
     // Update visual progress
-    this.progressFill.style.width = `${progressPercent}%`;
+    if (this.progressFill) {
+      this.progressFill.style.width = `${progressPercent}%`;
+    }
 
     // Update time display
-    this.currentTimeEl.textContent = this.formatTime(currentTime);
-    this.durationEl.textContent = this.formatTime(duration);
+    if (this.currentTimeEl) {
+      this.currentTimeEl.textContent = this.formatTime(currentTime);
+    }
+    if (this.durationEl) {
+      this.durationEl.textContent = this.formatTime(duration);
+    }
 
     // Update seek bar (but not while dragging)
-    if (!this.isDragging) {
+    if (!this.isDragging && this.seekBar) {
       this.seekBar.max = duration || 100;
       this.seekBar.value = currentTime || 0;
     }
@@ -110,3 +131,5 @@ class ProgressBar {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }
 }
+
+customElements.define('progress-bar', ProgressBar);

@@ -46,13 +46,12 @@ const DOM = {
     fileSelectorContainer: document.querySelector('#fileSelector'),
     playlistViewContainer: document.querySelector('#playlistView'),
     playerControls: document.querySelector('player-controls'),
-    progressBarContainer: document.querySelector('#progressBar'),
+    progressBar: document.querySelector('progress-bar'),
     nowPlayingInfo: document.querySelector('now-playing-info'),
     libraryBrowser: document.querySelector('library-browser'),
 };
 
 // Initialize components after DOM is ready
-let progressBar = null;
 let fileSelector = null;
 let playlistView = null;
 
@@ -786,7 +785,7 @@ let animationFrameId = null;
 function updateProgressSmooth() {
     const currentTime = DOM.audio.currentTime;
     const duration = DOM.audio.duration;
-    progressBar.updateProgress(currentTime, duration);
+    DOM.progressBar.updateProgress(currentTime, duration);
 
     // Continue updating while playing
     if (!DOM.audio.paused) {
@@ -976,7 +975,7 @@ DOM.playerControls.addEventListener('toggle-loop', toggleLoop);
 DOM.playerControls.addEventListener('toggle-shuffle', toggleShuffle);
 
 // Progress bar events
-DOM.progressBarContainer.addEventListener('seek', handleSeek);
+DOM.progressBar.addEventListener('seek', handleSeek);
 
 // ============================================
 // EVENT LISTENERS - AUDIO ELEMENT
@@ -1445,10 +1444,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     DOM.audio.volume = 1.0;
 
     // Initialize components
-    progressBar = new ProgressBar(DOM.progressBarContainer);
     fileSelector = new FileSelector(DOM.fileSelectorContainer);
     playlistView = new PlaylistView(DOM.playlistViewContainer);
-    // now-playing-info and player-controls are Web Components, auto-initialize via connectedCallback()
+    // now-playing-info, player-controls, and progress-bar are Web Components, auto-initialize via connectedCallback()
 
     // Try to load from cached snapshot first (instant, no scanning)
     updateLoadingProgress('Loading library...');
