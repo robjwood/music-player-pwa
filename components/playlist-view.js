@@ -423,30 +423,40 @@ class PlaylistView {
 
     // Add-to-playlist button listeners
     const addBtns = playlistEl.querySelectorAll('.add-playlist-btn');
-    addBtns.forEach((btn, idx) => {
+    addBtns.forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const track = this.tracks[idx];
-        if (track) {
-          this.container.dispatchEvent(new CustomEvent('add-track-to-playlist', {
-            detail: { track },
-            bubbles: true,
-            composed: true
-          }));
+        // Get the track index from the parent item's data-index attribute
+        const item = btn.closest('[data-index]');
+        if (item) {
+          const index = parseInt(item.dataset.index, 10);
+          const track = this.tracks[index];
+          if (track) {
+            this.container.dispatchEvent(new CustomEvent('add-track-to-playlist', {
+              detail: { track },
+              bubbles: true,
+              composed: true
+            }));
+          }
         }
       });
     });
 
     // Delete button listeners
     const deleteBtns = playlistEl.querySelectorAll('.delete-track-btn');
-    deleteBtns.forEach((btn, idx) => {
+    deleteBtns.forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.container.dispatchEvent(new CustomEvent('delete-track', {
-          detail: { index: idx },
-          bubbles: true,
-          composed: true
-        }));
+        // Get the track index from the parent item's data-index attribute
+        const item = btn.closest('[data-index]');
+        if (item) {
+          const index = parseInt(item.dataset.index, 10);
+          this.container.dispatchEvent(new CustomEvent('delete-track', {
+            detail: { index },
+            bubbles: true,
+            composed: true
+          }));
+        }
       });
     });
   }
