@@ -91,6 +91,7 @@ body {
 
 /* Now Playing Action Buttons */
 .now-playing-btn {
+    display: inline-block !important;
     background: #2a2a2a;
     border: 1px solid #444;
     color: #888;
@@ -100,6 +101,8 @@ body {
     font-size: 1rem;
     transition: all 0.2s;
     min-width: 36px;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .now-playing-btn:hover {
