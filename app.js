@@ -860,13 +860,13 @@ function updateAllComponents() {
         const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
         nowPlayingInfo.setTrack(currentFile, currentTrack);
         // Show action buttons when a track is selected
-        document.getElementById('likeTrackBtn').style.display = 'block';
-        document.getElementById('addTrackBtn').style.display = 'block';
+        document.getElementById('likeTrackBtn').classList.add('visible');
+        document.getElementById('addTrackBtn').classList.add('visible');
     } else {
         nowPlayingInfo.clearTrack();
         // Hide action buttons when no track is selected
-        document.getElementById('likeTrackBtn').style.display = 'none';
-        document.getElementById('addTrackBtn').style.display = 'none';
+        document.getElementById('likeTrackBtn').classList.remove('visible');
+        document.getElementById('addTrackBtn').classList.remove('visible');
     }
 
     // Update play button
