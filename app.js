@@ -473,7 +473,15 @@ function toggleLoop() {
  * Handle adding a track to a playlist
  */
 async function handleAddTrackToPlaylist(event) {
-    const track = event.detail.track;
+    console.log('[App] handleAddTrackToPlaylist called with event:', event);
+    const track = event.detail?.track;
+    console.log('[App] Track from event:', track);
+
+    if (!track) {
+        console.warn('[App] No track in event detail');
+        return;
+    }
+
     playerState.pendingTrack = track;
 
     // Load playlists and show modal
@@ -495,7 +503,14 @@ async function handleAddAllToPlaylist(event) {
  * Handle adding current track to the "Liked" playlist
  */
 async function handleAddToLiked(event) {
-    const track = event.detail.track;
+    console.log('[App] handleAddToLiked called with event:', event);
+    const track = event.detail?.track;
+    console.log('[App] Track from event:', track);
+
+    if (!track) {
+        console.warn('[App] No track in event detail');
+        return;
+    }
 
     try {
         // Get or create the "Liked" playlist
