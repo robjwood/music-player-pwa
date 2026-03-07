@@ -41,8 +41,24 @@
         </div>
       </div>
 
-      <!-- Progress Bar Component -->
-      <progress-bar></progress-bar>
+      <!-- Progress Bar -->
+      <div id="progressBar" class="progress-bar-container">
+        <div class="progress-bar">
+          <div class="progress-fill"></div>
+          <input
+            type="range"
+            class="seek-bar"
+            min="0"
+            max="100"
+            value="0"
+            aria-label="Seek bar"
+          >
+        </div>
+        <div class="time-display">
+          <span class="current-time">0:00</span>
+          <span class="duration">0:00</span>
+        </div>
+      </div>
 
       <!-- Player Controls Component -->
       <player-controls></player-controls>

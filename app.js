@@ -46,10 +46,13 @@ const DOM = {
     fileSelector: document.querySelector('file-selector'),
     playlistView: document.querySelector('playlist-view'),
     playerControls: document.querySelector('player-controls'),
-    progressBar: document.querySelector('progress-bar'),
+    progressBarContainer: document.querySelector('#progressBar'),
     nowPlayingInfo: document.querySelector('now-playing-info'),
     libraryBrowser: document.querySelector('library-browser'),
 };
+
+// Initialize progress bar after DOM is ready
+let progressBar = null;
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -781,7 +784,7 @@ let animationFrameId = null;
 function updateProgressSmooth() {
     const currentTime = DOM.audio.currentTime;
     const duration = DOM.audio.duration;
-    DOM.progressBar.updateProgress(currentTime, duration);
+    progressBar.updateProgress(currentTime, duration);
 
     // Continue updating while playing
     if (!DOM.audio.paused) {
@@ -977,7 +980,7 @@ DOM.playerControls.addEventListener('toggle-loop', toggleLoop);
 DOM.playerControls.addEventListener('toggle-shuffle', toggleShuffle);
 
 // Progress bar events
-DOM.progressBar.addEventListener('seek', handleSeek);
+DOM.progressBarContainer.addEventListener('seek', handleSeek);
 
 // ============================================
 // EVENT LISTENERS - AUDIO ELEMENT
@@ -1444,6 +1447,9 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Set default volume
     DOM.audio.volume = 1.0;
+
+    // Initialize progress bar
+    progressBar = new ProgressBar(DOM.progressBarContainer);
 
     // Try to load from cached snapshot first (instant, no scanning)
     updateLoadingProgress('Loading library...');
