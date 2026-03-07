@@ -1,15 +1,22 @@
 /**
  * FILE SELECTOR COMPONENT
  *
- * Manages folder selection and file scanning with File System Access API.
- * HTML is defined in index.html; this class enhances it with interactivity.
+ * Web Component that enhances HTML folder picker with File System Access API.
+ * HTML structure (buttons, file count) is defined in index.html.
+ * This component wraps that HTML and adds folder selection and file scanning.
  *
- * Usage:
- *   const fileSelector = new FileSelector(document.querySelector('#fileSelector'));
+ * Usage in HTML:
+ *   <file-selector>
+ *     <div class="file-selector-controls">
+ *       <button class="folder-btn">📁 Select Folder</button>
+ *       <button class="clear-btn">✕ Clear</button>
+ *       <div class="file-count">No files selected</div>
+ *     </div>
+ *   </file-selector>
  *
  * Events emitted:
  *   - files-selected: { detail: { files: File[], fromFolder: bool, folderName: string, folderHandle } }
- *   - clear-playlist: {}
+ *   - clear-playlist: {} - When user confirms clearing playlist
  *
  * Methods:
  *   updateFileCount(count) - Update the count display
@@ -50,16 +57,18 @@ async function scanDirectory(dirHandle, audioFiles = [], onProgress = null) {
     return audioFiles;
 }
 
-class FileSelector {
-    constructor(container) {
-        this.container = container;
+class FileSelector extends HTMLElement {
+    constructor() {
+        super();
         this.isScanning = false;
+    }
 
+    connectedCallback() {
         // Cache DOM elements
-        this.folderBtn = this.container.querySelector('.folder-btn');
-        this.clearBtn = this.container.querySelector('.clear-btn');
-        this.fileCountEl = this.container.querySelector('.file-count');
-        this.controlsDiv = this.container.querySelector('.file-selector-controls');
+        this.folderBtn = this.querySelector('.folder-btn');
+        this.clearBtn = this.querySelector('.clear-btn');
+        this.fileCountEl = this.querySelector('.file-count');
+        this.controlsDiv = this.querySelector('.file-selector-controls');
 
         this.setupEventListeners();
     }
@@ -69,20 +78,24 @@ class FileSelector {
      */
     setupEventListeners() {
         // Folder picker button
-        this.folderBtn.addEventListener('click', () => {
-            this.handleFolderSelection();
-        });
+        if (this.folderBtn) {
+            this.folderBtn.addEventListener('click', () => {
+                this.handleFolderSelection();
+            });
+        }
 
         // Clear button
-        this.clearBtn.addEventListener('click', () => {
-            // Ask for confirmation
-            if (confirm('Are you sure you want to clear the playlist?')) {
-                this.container.dispatchEvent(new CustomEvent('clear-playlist', {
-                    bubbles: true,
-                    composed: true,
-                }));
-            }
-        });
+        if (this.clearBtn) {
+            this.clearBtn.addEventListener('click', () => {
+                // Ask for confirmation
+                if (confirm('Are you sure you want to clear the playlist?')) {
+                    this.dispatchEvent(new CustomEvent('clear-playlist', {
+                        bubbles: true,
+                        composed: true,
+                    }));
+                }
+            });
+        }
     }
 
     /**
@@ -130,7 +143,7 @@ class FileSelector {
             MusicPlayerDB.addFolderHandle(dirHandle).catch(err => console.warn('Failed to add folder handle:', err));
 
             // Emit custom event with found files, tagged as from folder
-            this.container.dispatchEvent(new CustomEvent('files-selected', {
+            this.dispatchEvent(new CustomEvent('files-selected', {
                 detail: { files: audioFiles, fromFolder: true, folderName: dirHandle.name, folderHandle: dirHandle },
                 bubbles: true,
                 composed: true,
@@ -182,7 +195,7 @@ class FileSelector {
         `;
 
         // Insert banner at the top of the file-selector
-        this.container.insertBefore(banner, this.controlsDiv);
+        this.insertBefore(banner, this.controlsDiv);
 
         // Handle restore click
         const restoreBtn = banner.querySelector('.restore-btn');
@@ -212,3 +225,5 @@ class FileSelector {
         return text.replace(/[&<>"']/g, m => map[m]);
     }
 }
+
+customElements.define('file-selector', FileSelector);

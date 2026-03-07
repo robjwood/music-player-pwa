@@ -43,7 +43,7 @@ const playerState = {
 
 const DOM = {
     audio: document.getElementById('audioElement'),
-    fileSelectorContainer: document.querySelector('#fileSelector'),
+    fileSelector: document.querySelector('file-selector'),
     playlistViewContainer: document.querySelector('#playlistView'),
     playerControls: document.querySelector('player-controls'),
     progressBar: document.querySelector('progress-bar'),
@@ -52,7 +52,6 @@ const DOM = {
 };
 
 // Initialize components after DOM is ready
-let fileSelector = null;
 let playlistView = null;
 
 // ============================================
@@ -134,7 +133,7 @@ async function handleFilesSelected(event) {
     const tracks = await MusicMetadata.parseAllMetadata(
         audioFiles,
         (loaded, total) => {
-            fileSelector.updateFileCount(`Loading metadata… ${loaded}/${total}`);
+            DOM.fileSelector.updateFileCount(`Loading metadata… ${loaded}/${total}`);
             // Also update loading screen if visible
             const loadingScreen = document.getElementById('loadingScreen');
             if (loadingScreen && loadingScreen.style.display !== 'none') {
@@ -197,7 +196,7 @@ async function handleFilesSelected(event) {
 
     // Update the UI with full library for global search
     playlistView.setTracks(playerState.displayedTracks, null, true, playerState.sortedLibrary);
-    fileSelector.updateFileCount(playerState.playlist.length);
+    DOM.fileSelector.updateFileCount(playerState.playlist.length);
     playlistView.setCurrentTrack(playerState.currentIndex);
     DOM.playerControls.setPlayState(playerState.isPlaying);
 
@@ -284,7 +283,7 @@ function handleLibraryFilterChanged(event) {
     if (playerState.currentIndex >= 0) {
         playlistView.setCurrentTrack(playerState.currentIndex);
     }
-    fileSelector.updateFileCount(playerState.playlist.length);
+    DOM.fileSelector.updateFileCount(playerState.playlist.length);
 
     // Update now-playing in case metadata display needs to change
     if (playerState.currentIndex >= 0) {
@@ -683,7 +682,7 @@ async function handleDeleteTrackFromPlaylist(event) {
             playerState.currentIndex = -1;
 
             playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId, true, playerState.sortedLibrary);
-            fileSelector.updateFileCount(playerState.playlist.length);
+            DOM.fileSelector.updateFileCount(playerState.playlist.length);
         }
 
         // Reload playlists in sidebar to update track counts
@@ -848,7 +847,7 @@ function updateAllComponents() {
     }
 
     // Update file count
-    fileSelector.updateFileCount(playerState.playlist.length);
+    DOM.fileSelector.updateFileCount(playerState.playlist.length);
 
     // Update now playing info
     if (playerState.currentIndex >= 0 && playerState.currentIndex < playerState.playlist.length) {
@@ -908,8 +907,8 @@ document.addEventListener('keydown', (event) => {
 // ============================================
 
 // File selector events
-DOM.fileSelectorContainer.addEventListener('files-selected', handleFilesSelected);
-DOM.fileSelectorContainer.addEventListener('clear-playlist', handleClearPlaylist);
+DOM.fileSelector.addEventListener('files-selected', handleFilesSelected);
+DOM.fileSelector.addEventListener('clear-playlist', handleClearPlaylist);
 
 // Library browser events
 DOM.libraryBrowser.addEventListener('library-filter-changed', handleLibraryFilterChanged);
@@ -1153,7 +1152,7 @@ async function verifySnapshotInBackground() {
         if (percentChange > 0.1) {
             // More than 10% change detected, offer to rescan
             console.warn(`Folder has changed: ${fileCount} files vs ${expectedCount} cached`);
-            fileSelector.showRestoreBanner(
+            DOM.fileSelector.showRestoreBanner(
                 `${snapshot.folderName} - files changed. Click to refresh.`,
                 async () => {
                     try {
@@ -1385,7 +1384,7 @@ async function recoverFromSnapshot() {
         console.log(`Found cached snapshot for folder: ${snapshot.folderName} (${snapshot.trackCount} songs)`);
 
         // Show recovery banner
-        fileSelector.showRestoreBanner(
+        DOM.fileSelector.showRestoreBanner(
             `${snapshot.folderName} (${snapshot.trackCount} songs - cached)`,
             async () => {
                 // When user clicks, prompt them to re-select the folder
@@ -1444,9 +1443,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     DOM.audio.volume = 1.0;
 
     // Initialize components
-    fileSelector = new FileSelector(DOM.fileSelectorContainer);
     playlistView = new PlaylistView(DOM.playlistViewContainer);
-    // now-playing-info, player-controls, and progress-bar are Web Components, auto-initialize via connectedCallback()
+    // now-playing-info, player-controls, progress-bar, and file-selector are Web Components, auto-initialize via connectedCallback()
 
     // Try to load from cached snapshot first (instant, no scanning)
     updateLoadingProgress('Loading library...');
@@ -1476,7 +1474,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     foldersBtn.addEventListener('click', () => {
         // Reset file count when opening dialog
-        fileSelector.updateFileCount(0);
+        DOM.fileSelector.updateFileCount(0);
         foldersDialog.showModal();
     });
 
@@ -1507,7 +1505,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                     foldersDialog.close();
                 } else {
                     // Reset file count when opening dialog
-                    fileSelector.updateFileCount(0);
+                    DOM.fileSelector.updateFileCount(0);
                     foldersDialog.showModal();
                 }
             }
