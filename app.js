@@ -859,14 +859,8 @@ function updateAllComponents() {
         const currentFile = playerState.playlist[playerState.currentIndex];
         const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
         nowPlayingInfo.setTrack(currentFile, currentTrack);
-        // Show action buttons when a track is selected
-        document.getElementById('likeTrackBtn').classList.add('visible');
-        document.getElementById('addTrackBtn').classList.add('visible');
     } else {
         nowPlayingInfo.clearTrack();
-        // Hide action buttons when no track is selected
-        document.getElementById('likeTrackBtn').classList.remove('visible');
-        document.getElementById('addTrackBtn').classList.remove('visible');
     }
 
     // Update play button
