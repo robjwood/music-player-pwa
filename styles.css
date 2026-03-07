@@ -89,6 +89,37 @@ body {
     padding: 1rem;
 }
 
+/* Now Playing Action Buttons */
+.now-playing-btn {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #888;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+    min-width: 36px;
+}
+
+.now-playing-btn:hover {
+    background: #333;
+    border-color: #666;
+}
+
+#likeTrackBtn:hover {
+    color: #e74c3c;
+}
+
+#addTrackBtn:hover {
+    color: #4a9eff;
+}
+
+.now-playing-btn:active {
+    background: #1a1a1a;
+    border-color: #4a9eff;
+}
+
 /* ============================================
    SCROLLBAR STYLING
    ============================================ */

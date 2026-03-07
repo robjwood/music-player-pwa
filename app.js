@@ -851,8 +851,14 @@ function updateAllComponents() {
         const currentFile = playerState.playlist[playerState.currentIndex];
         const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
         DOM.nowPlayingInfo.setTrack(currentFile, currentTrack);
+        // Show action buttons when a track is selected
+        document.getElementById('likeTrackBtn').style.display = 'block';
+        document.getElementById('addTrackBtn').style.display = 'block';
     } else {
         DOM.nowPlayingInfo.clearTrack();
+        // Hide action buttons when no track is selected
+        document.getElementById('likeTrackBtn').style.display = 'none';
+        document.getElementById('addTrackBtn').style.display = 'none';
     }
 
     // Update play button
@@ -918,12 +924,36 @@ DOM.playlistView.addEventListener('add-all-to-playlist', handleAddAllToPlaylist)
 DOM.playlistView.addEventListener('delete-track-from-playlist', handleDeleteTrackFromPlaylist);
 
 // Now playing events (add to playlist from player)
-DOM.nowPlayingInfo.addEventListener('add-to-liked', handleAddToLiked);
-DOM.nowPlayingInfo.addEventListener('add-to-playlist', handleAddTrackToPlaylist);
 DOM.nowPlayingInfo.addEventListener('scroll-to-track', () => {
     // Scroll the playlist view to show the currently playing track
     DOM.playlistView.scrollCurrentTrackIntoView();
 });
+
+// Now playing buttons in footer
+const likeTrackBtn = document.getElementById('likeTrackBtn');
+const addTrackBtn = document.getElementById('addTrackBtn');
+
+likeTrackBtn.addEventListener('click', () => {
+    if (playerState.currentIndex >= 0 && playerState.displayedTracks[playerState.currentIndex]) {
+        const event = new CustomEvent('add-to-liked', {
+            detail: { track: playerState.displayedTracks[playerState.currentIndex] }
+        });
+        DOM.nowPlayingInfo.dispatchEvent(event);
+    }
+});
+
+addTrackBtn.addEventListener('click', () => {
+    if (playerState.currentIndex >= 0 && playerState.displayedTracks[playerState.currentIndex]) {
+        const event = new CustomEvent('add-to-playlist', {
+            detail: { track: playerState.displayedTracks[playerState.currentIndex] }
+        });
+        DOM.nowPlayingInfo.dispatchEvent(event);
+    }
+});
+
+// Listen for these events on the app level
+document.addEventListener('add-to-liked', handleAddToLiked);
+document.addEventListener('add-to-playlist', handleAddTrackToPlaylist);
 
 // Playlist Modal events
 document.getElementById('closePlaylistModal').addEventListener('click', () => {
