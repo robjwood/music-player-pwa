@@ -381,18 +381,17 @@ class LibraryBrowser extends HTMLElement {
         let html = '';
         this.playlists.forEach((playlist, idx) => {
             const trackCount = playlist.tracks ? playlist.tracks.length : 0;
-            html += `<div class="entity-item ${this.selectedPlaylist === playlist.id ? 'active' : ''}" data-playlist="${idx}">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <span>
-                        ${this.escapeHtml(playlist.name)}
-                        <span style="color: #666; font-size: 0.75rem; margin-left: 0.5rem;">(${trackCount})</span>
-                    </span>
-                    <button class="delete-playlist-btn" data-playlist-id="${playlist.id}" title="Delete playlist" style="background: none; border: none; color: #666; cursor: pointer; padding: 0.2rem 0.4rem; font-size: 0.9rem;">✕</button>
-                </div>
+            html += `<div class="entity-item ${this.selectedPlaylist === playlist.id ? 'active' : ''}" data-playlist="${idx}" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="flex: 1;">
+                    ${this.escapeHtml(playlist.name)}
+                    <span style="color: #666; font-size: 0.75rem; margin-left: 0.5rem;">(${trackCount})</span>
+                </span>
+                <button class="delete-playlist-btn" data-playlist-id="${playlist.id}" title="Delete playlist" style="background: #2a2a2a; border: 1px solid #444; color: #666; cursor: pointer; padding: 0.3rem 0.5rem; border-radius: 3px; font-size: 0.85rem; flex-shrink: 0;">✕</button>
             </div>`;
         });
 
         listContainer.innerHTML = html;
+        console.log('📋 renderPlaylistList called with', this.playlists.length, 'playlists');
 
         // Add event listeners for playlist selection
         const playlistItems = listContainer.querySelectorAll('.entity-item');
