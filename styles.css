@@ -450,11 +450,6 @@ input:focus {
     color: #4a9eff;
 }
 
-.playlist-view .playlist-item:hover .add-playlist-btn,
-.playlist-view .playlist-item:hover .delete-track-btn {
-    display: inline-block !important;
-}
-
 .playlist-view .playlist-item.unavailable {
     opacity: 0.5;
     cursor: not-allowed;

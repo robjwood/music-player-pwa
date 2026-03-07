@@ -279,8 +279,8 @@ class PlaylistView extends HTMLElement {
         html += `<div class="playlist-item${isActive}${isUnavailable}" data-index="${idx}">
           <span class="track-label">${trackNumStr}. ${this.escapeHtml(trackTitle)}</span>
           <span class="track-meta">${track.year || ''} ${formatDuration(track.duration)}</span>
-          <button class="add-playlist-btn" title="Add to playlist" style="display: none;">+</button>
-          <button class="delete-track-btn" title="Delete from playlist" style="display: none;">✕</button>
+          <button class="add-playlist-btn" title="Add to playlist">+</button>
+          <button class="delete-track-btn" title="Delete from playlist">✕</button>
         </div>`;
       });
     });
