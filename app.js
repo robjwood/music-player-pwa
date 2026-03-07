@@ -44,7 +44,7 @@ const playerState = {
 const DOM = {
     audio: document.getElementById('audioElement'),
     fileSelector: document.querySelector('file-selector'),
-    playlistViewContainer: document.querySelector('#playlistView'),
+    playlistView: document.querySelector('playlist-view'),
     playerControls: document.querySelector('player-controls'),
     progressBar: document.querySelector('progress-bar'),
     nowPlayingInfo: document.querySelector('now-playing-info'),
@@ -52,7 +52,7 @@ const DOM = {
 };
 
 // Initialize components after DOM is ready
-let playlistView = null;
+// (All are now Web Components, instantiated automatically)
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -195,9 +195,9 @@ async function handleFilesSelected(event) {
     await loadAndSetPlaylists();
 
     // Update the UI with full library for global search
-    playlistView.setTracks(playerState.displayedTracks, null, true, playerState.sortedLibrary);
+    DOM.playlistView.setTracks(playerState.displayedTracks, null, true, playerState.sortedLibrary);
     DOM.fileSelector.updateFileCount(playerState.playlist.length);
-    playlistView.setCurrentTrack(playerState.currentIndex);
+    DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     DOM.playerControls.setPlayState(playerState.isPlaying);
 
     // Update now-playing
@@ -279,9 +279,9 @@ function handleLibraryFilterChanged(event) {
 
     console.time('handleLibraryFilterChanged-UI');
     // Update UI components with full library for global search
-    playlistView.setTracks(playerState.displayedTracks, playlistId, true, playerState.sortedLibrary);
+    DOM.playlistView.setTracks(playerState.displayedTracks, playlistId, true, playerState.sortedLibrary);
     if (playerState.currentIndex >= 0) {
-        playlistView.setCurrentTrack(playerState.currentIndex);
+        DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
     DOM.fileSelector.updateFileCount(playerState.playlist.length);
 
@@ -681,7 +681,7 @@ async function handleDeleteTrackFromPlaylist(event) {
             playerState.playlist = sorted.map(t => t.file);
             playerState.currentIndex = -1;
 
-            playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId, true, playerState.sortedLibrary);
+            DOM.playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId, true, playerState.sortedLibrary);
             DOM.fileSelector.updateFileCount(playerState.playlist.length);
         }
 
@@ -764,9 +764,9 @@ function toggleShuffle() {
     console.time('toggleShuffle-updateUI');
     // Update UI with full library for global search
     DOM.playerControls.setShuffleState(playerState.isShuffling);
-    playlistView.setTracks(playerState.displayedTracks, null, true, playerState.sortedLibrary);
+    DOM.playlistView.setTracks(playerState.displayedTracks, null, true, playerState.sortedLibrary);
     if (playerState.currentIndex >= 0) {
-        playlistView.setCurrentTrack(playerState.currentIndex);
+        DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
     console.timeEnd('toggleShuffle-updateUI');
     console.timeEnd('toggleShuffle-total');
@@ -841,9 +841,9 @@ function onPlayPauseChange() {
 function updateAllComponents() {
     // Update playlist view (don't clear search - just updating which track is current)
     // Pass full sorted library for global search capability
-    playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId, false, playerState.sortedLibrary);
+    DOM.playlistView.setTracks(playerState.displayedTracks, playerState.currentPlaylistId, false, playerState.sortedLibrary);
     if (playerState.currentIndex >= 0) {
-        playlistView.setCurrentTrack(playerState.currentIndex);
+        DOM.playlistView.setCurrentTrack(playerState.currentIndex);
     }
 
     // Update file count
@@ -915,15 +915,15 @@ DOM.libraryBrowser.addEventListener('library-filter-changed', handleLibraryFilte
 DOM.libraryBrowser.addEventListener('delete-playlist', handleDeletePlaylist);
 
 // Playlist events
-DOM.playlistViewContainer.addEventListener('track-selected', handleTrackSelected);
-DOM.playlistViewContainer.addEventListener('add-track-to-playlist', handleAddTrackToPlaylist);
-DOM.playlistViewContainer.addEventListener('add-all-to-playlist', handleAddAllToPlaylist);
-DOM.playlistViewContainer.addEventListener('delete-track', handleDeleteTrackFromPlaylist);
+DOM.playlistView.addEventListener('track-selected', handleTrackSelected);
+DOM.playlistView.addEventListener('add-track-to-playlist', handleAddTrackToPlaylist);
+DOM.playlistView.addEventListener('add-all-to-playlist', handleAddAllToPlaylist);
+DOM.playlistView.addEventListener('delete-track', handleDeleteTrackFromPlaylist);
 
 // Now playing events (add to playlist from player)
 DOM.nowPlayingInfo.addEventListener('scroll-to-track', () => {
     // Scroll the playlist view to show the currently playing track
-    playlistView.scrollCurrentTrackIntoView();
+    DOM.playlistView.scrollCurrentTrackIntoView();
 });
 
 // Now playing buttons in footer
@@ -1442,9 +1442,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Set default volume
     DOM.audio.volume = 1.0;
 
-    // Initialize components
-    playlistView = new PlaylistView(DOM.playlistViewContainer);
-    // now-playing-info, player-controls, progress-bar, and file-selector are Web Components, auto-initialize via connectedCallback()
+    // All components are now Web Components, auto-initialized via connectedCallback()
 
     // Try to load from cached snapshot first (instant, no scanning)
     updateLoadingProgress('Loading library...');

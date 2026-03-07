@@ -1,19 +1,28 @@
 /**
  * PLAYLIST VIEW COMPONENT
  *
- * Displays tracks grouped by album with CMUS-style formatting.
- * Each track shows title + track number, with album headers.
- * HTML is defined in index.html; this class enhances it with interactivity.
+ * Web Component that displays tracks grouped by album with CMUS-style formatting.
+ * HTML structure (search bar, playlist container) is defined in index.html.
+ * This component wraps that HTML and adds rendering, search, and interactivity.
  *
- * Usage:
- *   const playlistView = new PlaylistView(document.querySelector('#playlistView'));
+ * Usage in HTML:
+ *   <playlist-view>
+ *     <div class="search-bar">
+ *       <input class="search-input" type="text" placeholder="Search tracks…">
+ *       <button class="add-all-btn" style="display: none;">Add All</button>
+ *       <button class="search-clear">✕</button>
+ *     </div>
+ *     <div class="playlist"></div>
+ *   </playlist-view>
  *
  * Events emitted:
- *   - track-selected: { detail: { index: number } }
- *   - add-all-to-playlist: { detail: { tracks: Track[] } }
+ *   - track-selected: { detail: { index: number } } - When clicking a track
+ *   - add-track-to-playlist: { detail: { track } } - When clicking + on a track
+ *   - add-all-to-playlist: { detail: { tracks: Track[] } } - When clicking Add All
+ *   - delete-track: { detail: { index } } - When clicking delete button
  *
  * Methods:
- *   setTracks(tracks, playlistId, clearSearch, fullLibrary) - Set the Track[] to display (already sorted)
+ *   setTracks(tracks, playlistId, clearSearch, fullLibrary) - Set the Track[] to display
  *   setCurrentTrack(index) - Mark a track as currently playing
  *   scrollCurrentTrackIntoView() - Scroll to the currently playing track
  */
@@ -30,9 +39,9 @@ function parseTrackNumber(trackStr) {
   return isNaN(n) ? 0 : n;
 }
 
-class PlaylistView {
-  constructor(container) {
-    this.container = container;
+class PlaylistView extends HTMLElement {
+  constructor() {
+    super();
     this.tracks = [];
     this.fullLibrary = [];  // Full library for global search (all tracks, not filtered)
     this.currentIndex = -1;
@@ -41,7 +50,9 @@ class PlaylistView {
     this.renderBatchId = null;  // Track pending render batches
     this.searchSelectedArtist = null;  // Artist selected from search results
     this.searchSelectedAlbum = null;  // Album selected from search results
+  }
 
+  connectedCallback() {
     this.setupEventListeners();
   }
 
@@ -49,9 +60,9 @@ class PlaylistView {
    * Set up event listeners for search and clear button
    */
   setupEventListeners() {
-    const searchInput = this.container.querySelector('.search-input');
-    const searchClear = this.container.querySelector('.search-clear');
-    const addAllBtn = this.container.querySelector('.add-all-btn');
+    const searchInput = this.querySelector('.search-input');
+    const searchClear = this.querySelector('.search-clear');
+    const addAllBtn = this.querySelector('.add-all-btn');
 
     searchInput.addEventListener('input', () => {
       this.searchQuery = searchInput.value;
@@ -74,7 +85,7 @@ class PlaylistView {
     addAllBtn.addEventListener('click', () => {
       const filteredTracks = this.getFilteredTracks();
       if (filteredTracks.length > 0) {
-        this.container.dispatchEvent(new CustomEvent('add-all-to-playlist', {
+        this.dispatchEvent(new CustomEvent('add-all-to-playlist', {
           detail: { tracks: filteredTracks },
           bubbles: true,
           composed: true
@@ -162,7 +173,7 @@ class PlaylistView {
    * Update visibility of the "Add All" button based on search state and context
    */
   updateAddAllButtonVisibility() {
-    const addAllBtn = this.container.querySelector('.add-all-btn');
+    const addAllBtn = this.querySelector('.add-all-btn');
     if (!addAllBtn) return;
 
     // Show "Add All" button only if:
@@ -188,8 +199,8 @@ class PlaylistView {
       this.searchQuery = '';
       this.searchSelectedArtist = null;
       this.searchSelectedAlbum = null;
-      const searchInput = this.container.querySelector('.search-input');
-      const searchClear = this.container.querySelector('.search-clear');
+      const searchInput = this.querySelector('.search-input');
+      const searchClear = this.querySelector('.search-clear');
       if (searchInput) {
         searchInput.value = '';
         searchClear.style.display = 'none';
@@ -214,7 +225,7 @@ class PlaylistView {
    * Render the playlist items grouped by album
    */
   renderPlaylist() {
-    const playlistEl = this.container.querySelector('.playlist');
+    const playlistEl = this.querySelector('.playlist');
     if (!playlistEl) return;
 
     if (this.searchQuery) {
@@ -282,7 +293,7 @@ class PlaylistView {
    * Render search results with grouped sections (Artists, Albums, Tracks)
    */
   renderSearchResults() {
-    const playlistEl = this.container.querySelector('.playlist');
+    const playlistEl = this.querySelector('.playlist');
     const artists = this.getUniqueArtists();
     const albums = this.getUniqueAlbums();
     const filteredTracks = this.getFilteredTracks();
@@ -381,7 +392,7 @@ class PlaylistView {
    * Set up event listeners for playlist items (click to select track)
    */
   setupPlaylistItemListeners() {
-    const playlistEl = this.container.querySelector('.playlist');
+    const playlistEl = this.querySelector('.playlist');
     if (!playlistEl) return;
 
     // Track selection listeners
@@ -394,7 +405,7 @@ class PlaylistView {
         }
 
         const index = parseInt(item.dataset.index, 10);
-        this.container.dispatchEvent(new CustomEvent('track-selected', {
+        this.dispatchEvent(new CustomEvent('track-selected', {
           detail: { index },
           bubbles: true,
           composed: true
@@ -432,7 +443,7 @@ class PlaylistView {
           const index = parseInt(item.dataset.index, 10);
           const track = this.tracks[index];
           if (track) {
-            this.container.dispatchEvent(new CustomEvent('add-track-to-playlist', {
+            this.dispatchEvent(new CustomEvent('add-track-to-playlist', {
               detail: { track },
               bubbles: true,
               composed: true
@@ -451,7 +462,7 @@ class PlaylistView {
         const item = btn.closest('[data-index]');
         if (item) {
           const index = parseInt(item.dataset.index, 10);
-          this.container.dispatchEvent(new CustomEvent('delete-track', {
+          this.dispatchEvent(new CustomEvent('delete-track', {
             detail: { index },
             bubbles: true,
             composed: true
@@ -465,7 +476,7 @@ class PlaylistView {
    * Scroll the currently playing track into view
    */
   scrollCurrentTrackIntoView() {
-    const playlistEl = this.container.querySelector('.playlist');
+    const playlistEl = this.querySelector('.playlist');
     if (!playlistEl) return;
 
     const activeItem = playlistEl.querySelector('.playlist-item.active');
@@ -488,3 +499,5 @@ class PlaylistView {
     return text.replace(/[&<>"']/g, m => map[m]);
   }
 }
+
+customElements.define('playlist-view', PlaylistView);
