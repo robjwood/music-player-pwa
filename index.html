@@ -44,9 +44,9 @@
 
     <!-- Player Controls (Bottom) -->
     <footer class="player-footer">
-      <!-- Now Playing Info with Action Buttons -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 1rem;">
-        <div id="nowPlayingInfo" class="now-playing-info">
+      <!-- Now Playing Info with Action Buttons (Web Component) -->
+      <now-playing-info style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 1rem;">
+        <div class="now-playing-info">
           <div class="track-title" title="Click to scroll to track in playlist">No track selected</div>
           <div class="track-artist">Select a file to start</div>
         </div>
@@ -54,7 +54,7 @@
           <button id="likeTrackBtn" class="now-playing-btn" title="Add to Liked playlist">★</button>
           <button id="addTrackBtn" class="now-playing-btn" title="Add to playlist">+</button>
         </div>
-      </div>
+      </now-playing-info>
 
       <!-- Progress Bar -->
       <div id="progressBar" class="progress-bar-container">

@@ -47,14 +47,13 @@ const DOM = {
     playlistViewContainer: document.querySelector('#playlistView'),
     playerControlsContainer: document.querySelector('#playerControls'),
     progressBarContainer: document.querySelector('#progressBar'),
-    nowPlayingInfoContainer: document.querySelector('#nowPlayingInfo'),
+    nowPlayingInfo: document.querySelector('now-playing-info'),
     libraryBrowser: document.querySelector('library-browser'),
 };
 
 // Initialize components after DOM is ready
 let progressBar = null;
 let playerControls = null;
-let nowPlayingInfo = null;
 let fileSelector = null;
 let playlistView = null;
 
@@ -208,7 +207,7 @@ async function handleFilesSelected(event) {
     if (playerState.currentIndex >= 0 && playerState.currentIndex < playerState.playlist.length) {
         const currentFile = playerState.playlist[playerState.currentIndex];
         const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
-        nowPlayingInfo.setTrack(currentFile, currentTrack);
+        DOM.nowPlayingInfo.setTrack(currentFile, currentTrack);
     }
 }
 
@@ -292,7 +291,7 @@ function handleLibraryFilterChanged(event) {
     // Update now-playing in case metadata display needs to change
     if (playerState.currentIndex >= 0) {
         const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
-        nowPlayingInfo.setTrack(currentFile, currentTrack);
+        DOM.nowPlayingInfo.setTrack(currentFile, currentTrack);
     }
     console.timeEnd('handleLibraryFilterChanged-UI');
     console.timeEnd('handleLibraryFilterChanged-total');
@@ -857,9 +856,9 @@ function updateAllComponents() {
     if (playerState.currentIndex >= 0 && playerState.currentIndex < playerState.playlist.length) {
         const currentFile = playerState.playlist[playerState.currentIndex];
         const currentTrack = playerState.library.find(t => t.file === currentFile) || null;
-        nowPlayingInfo.setTrack(currentFile, currentTrack);
+        DOM.nowPlayingInfo.setTrack(currentFile, currentTrack);
     } else {
-        nowPlayingInfo.clearTrack();
+        DOM.nowPlayingInfo.clearTrack();
     }
 
     // Update play button
@@ -925,7 +924,7 @@ DOM.playlistViewContainer.addEventListener('add-all-to-playlist', handleAddAllTo
 DOM.playlistViewContainer.addEventListener('delete-track', handleDeleteTrackFromPlaylist);
 
 // Now playing events (add to playlist from player)
-DOM.nowPlayingInfoContainer.addEventListener('scroll-to-track', () => {
+DOM.nowPlayingInfo.addEventListener('scroll-to-track', () => {
     // Scroll the playlist view to show the currently playing track
     playlistView.scrollCurrentTrackIntoView();
 });
@@ -1449,9 +1448,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Initialize components
     progressBar = new ProgressBar(DOM.progressBarContainer);
     playerControls = new PlayerControls(DOM.playerControlsContainer);
-    nowPlayingInfo = new NowPlayingInfo(DOM.nowPlayingInfoContainer);
     fileSelector = new FileSelector(DOM.fileSelectorContainer);
     playlistView = new PlaylistView(DOM.playlistViewContainer);
+    // now-playing-info is a Web Component, auto-initializes via connectedCallback()
 
     // Try to load from cached snapshot first (instant, no scanning)
     updateLoadingProgress('Loading library...');

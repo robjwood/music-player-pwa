@@ -4,7 +4,8 @@
       "Bash(git:*)",
       "Bash(node:*)",
       "Bash(sed -e '19,32d' -e '44,356d')",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "WebFetch(domain:gomakethings.com)"
     ]
   }
 }

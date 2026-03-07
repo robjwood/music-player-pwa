@@ -1,38 +1,79 @@
 /**
  * NOW PLAYING INFO COMPONENT
  *
- * Displays the currently playing track title and artist.
- * HTML is defined in index.html; this class enhances it with interactivity.
+ * Web Component that enhances HTML buttons with interactivity.
+ * HTML structure (buttons, text) is defined in index.html.
+ * This component wraps that HTML and adds event handling and state management.
  *
- * Usage:
- *   const nowPlayingInfo = new NowPlayingInfo(document.querySelector('#nowPlayingInfo'));
+ * Usage in HTML:
+ *   <now-playing-info>
+ *     <div class="track-title">No track selected</div>
+ *     <div class="track-artist">Select a file to start</div>
+ *     <button id="likeTrackBtn" class="now-playing-btn">★</button>
+ *     <button id="addTrackBtn" class="now-playing-btn">+</button>
+ *   </now-playing-info>
  *
  * Events emitted:
- *   - scroll-to-track: {} - Emitted when user clicks on track info
+ *   - scroll-to-track: {} - When clicking track info
+ *   - add-to-liked: {detail: {track}} - When clicking like button
+ *   - add-to-playlist: {detail: {track}} - When clicking add button
  *
  * Methods:
  *   setTrack(file, track) - Update the displayed track
  *   clearTrack() - Clear the display
  */
 
-class NowPlayingInfo {
-  constructor(container) {
-    this.container = container;
+class NowPlayingInfo extends HTMLElement {
+  constructor() {
+    super();
     this.currentTrack = null;
+  }
 
+  connectedCallback() {
     // Cache DOM elements
-    this.titleEl = this.container.querySelector('.track-title');
-    this.artistEl = this.container.querySelector('.track-artist');
+    this.titleEl = this.querySelector('.track-title');
+    this.artistEl = this.querySelector('.track-artist');
+    this.likeBtn = this.querySelector('#likeTrackBtn');
+    this.addBtn = this.querySelector('#addTrackBtn');
 
-    // Add click handler to scroll to track
-    this.container.addEventListener('click', () => {
-      if (this.currentTrack) {
-        this.container.dispatchEvent(new CustomEvent('scroll-to-track', {
+    // Add click handler to info area to scroll to track
+    this.addEventListener('click', (e) => {
+      // Only trigger on info area, not button clicks
+      if (!e.target.classList.contains('now-playing-btn') && this.currentTrack) {
+        this.dispatchEvent(new CustomEvent('scroll-to-track', {
           bubbles: true,
           composed: true
         }));
       }
     });
+
+    // Add like button handler
+    if (this.likeBtn) {
+      this.likeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.currentTrack) {
+          this.dispatchEvent(new CustomEvent('add-to-liked', {
+            detail: { track: this.currentTrack },
+            bubbles: true,
+            composed: true
+          }));
+        }
+      });
+    }
+
+    // Add to playlist button handler
+    if (this.addBtn) {
+      this.addBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.currentTrack) {
+          this.dispatchEvent(new CustomEvent('add-to-playlist', {
+            detail: { track: this.currentTrack },
+            bubbles: true,
+            composed: true
+          }));
+        }
+      });
+    }
   }
 
   /**
@@ -59,8 +100,8 @@ class NowPlayingInfo {
     const title = track?.title || file.name.replace(/\.[^/.]+$/, '');
     const artist = track?.artist || 'Unknown Artist';
 
-    this.titleEl.textContent = title;
-    this.artistEl.textContent = artist;
+    if (this.titleEl) this.titleEl.textContent = title;
+    if (this.artistEl) this.artistEl.textContent = artist;
   }
 
   /**
@@ -69,7 +110,9 @@ class NowPlayingInfo {
   clearTrack() {
     this.currentTrack = null;
 
-    this.titleEl.textContent = 'No track selected';
-    this.artistEl.textContent = 'Select a file to start';
+    if (this.titleEl) this.titleEl.textContent = 'No track selected';
+    if (this.artistEl) this.artistEl.textContent = 'Select a file to start';
   }
 }
+
+customElements.define('now-playing-info', NowPlayingInfo);
