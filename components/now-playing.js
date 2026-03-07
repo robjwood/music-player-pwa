@@ -110,8 +110,8 @@ class NowPlayingInfo extends HTMLElement {
       </style>
 
       <div class="container">
-        <div class="track-info">
-          <div class="track-title">No track selected</div>
+        <div class="track-info" style="cursor: pointer; flex: 1;">
+          <div class="track-title" title="Click to scroll to track in playlist">No track selected</div>
           <div class="track-artist">Select a file to start</div>
         </div>
         <div class="buttons">
@@ -123,9 +123,22 @@ class NowPlayingInfo extends HTMLElement {
   }
 
   /**
-   * Attach click listeners to buttons
+   * Attach click listeners to buttons and track info
    */
   attachButtonListeners() {
+    // Click on track info to scroll to it in the playlist
+    const trackInfo = this.shadowRoot.querySelector('.track-info');
+    if (trackInfo) {
+      trackInfo.addEventListener('click', () => {
+        if (this.currentTrack) {
+          this.dispatchEvent(new CustomEvent('scroll-to-track', {
+            bubbles: true,
+            composed: true
+          }));
+        }
+      });
+    }
+
     const likeBtn = this.shadowRoot.querySelector('.like-btn');
     const addBtn = this.shadowRoot.querySelector('.add-btn');
 

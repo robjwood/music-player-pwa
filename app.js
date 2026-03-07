@@ -920,6 +920,10 @@ DOM.playlistView.addEventListener('delete-track-from-playlist', handleDeleteTrac
 // Now playing events (add to playlist from player)
 DOM.nowPlayingInfo.addEventListener('add-to-liked', handleAddToLiked);
 DOM.nowPlayingInfo.addEventListener('add-to-playlist', handleAddTrackToPlaylist);
+DOM.nowPlayingInfo.addEventListener('scroll-to-track', () => {
+    // Scroll the playlist view to show the currently playing track
+    DOM.playlistView.scrollCurrentTrackIntoView();
+});
 
 // Playlist Modal events
 document.getElementById('closePlaylistModal').addEventListener('click', () => {
