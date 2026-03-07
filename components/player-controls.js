@@ -1,160 +1,76 @@
 /**
  * PLAYER CONTROLS COMPONENT
  *
- * Play, Pause, Next, and Previous buttons
+ * Manages play, pause, next, previous, loop, and shuffle buttons.
+ * HTML is defined in index.html; this class enhances it with interactivity.
  *
  * Usage:
- *   <player-controls></player-controls>
+ *   const playerControls = new PlayerControls(document.querySelector('#playerControls'));
  *
  * Events emitted:
  *   - play-pause: {}
  *   - next-track: {}
  *   - previous-track: {}
+ *   - toggle-loop: {}
+ *   - toggle-shuffle: {}
  *
  * Methods:
  *   setPlayState(isPlaying) - Update button to show play or pause
+ *   setLoopState(isLooping) - Update loop button highlight state
+ *   setShuffleState(isShuffling) - Update shuffle button highlight state
  */
 
-class PlayerControls extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: 'open' });
+class PlayerControls {
+  constructor(container) {
+    this.container = container;
     this.isPlaying = false;
     this.isLooping = false;
     this.isShuffling = false;
-  }
 
-  connectedCallback() {
-    this.render();
+    // Cache DOM elements
+    this.playBtn = this.container.querySelector('.play-btn');
+    this.nextBtn = this.container.querySelector('.next-btn');
+    this.prevBtn = this.container.querySelector('.prev-btn');
+    this.loopBtn = this.container.querySelector('.loop-btn');
+    this.shuffleBtn = this.container.querySelector('.shuffle-btn');
+
     this.setupEventListeners();
-  }
-
-  /**
-   * Render the component's HTML and styles
-   */
-  render() {
-    this.shadowRoot.innerHTML = `
-      <style>
-          :host {
-            display: block;
-          }
-
-          .controls {
-            display: flex;
-            gap: 0.75rem;
-            justify-content: center;
-          }
-
-          .control-btn {
-            background-color: #2a2a2a;
-            border: 1px solid #444;
-            color: #e0e0e0;
-            padding: 0.4rem 1.2rem;
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: all 0.2s;
-            flex: 1;
-            max-width: 52px;
-          }
-
-          .control-btn:hover {
-            background-color: #333;
-            border-color: #555;
-          }
-
-          .control-btn:active {
-            background-color: #252525;
-          }
-
-          .control-btn--primary {
-            background-color: #4a9eff;
-            border-color: #4a9eff;
-            color: #000;
-            font-weight: 600;
-          }
-
-          .control-btn--primary:hover {
-            background-color: #5aafff;
-            border-color: #5aafff;
-          }
-
-          .control-btn--primary:active {
-            background-color: #3a8eef;
-            border-color: #3a8eef;
-          }
-
-          .control-btn.active {
-            background-color: #4a9eff;
-            border-color: #4a9eff;
-            color: #000;
-          }
-
-          .control-btn.active:hover {
-            background-color: #5aafff;
-            border-color: #5aafff;
-          }
-      </style>
-
-      <div class="controls">
-          <button class="control-btn shuffle-btn" aria-label="Toggle shuffle">
-              🔀
-          </button>
-          <button class="control-btn prev-btn" aria-label="Previous track (Left Arrow)">
-              ⏮
-          </button>
-          <button class="control-btn control-btn--primary play-btn" aria-label="Play/Pause (Space)">
-              ►
-          </button>
-          <button class="control-btn next-btn" aria-label="Next track (Right Arrow)">
-              ⏭
-          </button>
-          <button class="control-btn loop-btn" aria-label="Toggle loop">
-              🔁
-          </button>
-      </div>
-    `;
   }
 
   /**
    * Set up event listeners for button clicks
    */
   setupEventListeners() {
-    const playBtn = this.shadowRoot.querySelector('.play-btn');
-    const nextBtn = this.shadowRoot.querySelector('.next-btn');
-    const prevBtn = this.shadowRoot.querySelector('.prev-btn');
-    const loopBtn = this.shadowRoot.querySelector('.loop-btn');
-    const shuffleBtn = this.shadowRoot.querySelector('.shuffle-btn');
-
-    playBtn.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('play-pause', {
+    this.playBtn.addEventListener('click', () => {
+      this.container.dispatchEvent(new CustomEvent('play-pause', {
         bubbles: true,
         composed: true,
       }));
     });
 
-    nextBtn.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('next-track', {
+    this.nextBtn.addEventListener('click', () => {
+      this.container.dispatchEvent(new CustomEvent('next-track', {
         bubbles: true,
         composed: true,
       }));
     });
 
-    prevBtn.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('previous-track', {
+    this.prevBtn.addEventListener('click', () => {
+      this.container.dispatchEvent(new CustomEvent('previous-track', {
         bubbles: true,
         composed: true,
       }));
     });
 
-    loopBtn.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('toggle-loop', {
+    this.loopBtn.addEventListener('click', () => {
+      this.container.dispatchEvent(new CustomEvent('toggle-loop', {
         bubbles: true,
         composed: true,
       }));
     });
 
-    shuffleBtn.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('toggle-shuffle', {
+    this.shuffleBtn.addEventListener('click', () => {
+      this.container.dispatchEvent(new CustomEvent('toggle-shuffle', {
         bubbles: true,
         composed: true,
       }));
@@ -167,12 +83,11 @@ class PlayerControls extends HTMLElement {
    */
   setPlayState(isPlaying) {
     this.isPlaying = isPlaying;
-    const playBtn = this.shadowRoot.querySelector('.play-btn');
 
     if (isPlaying) {
-      playBtn.textContent = '⏸';
+      this.playBtn.textContent = '⏸';
     } else {
-      playBtn.textContent = '▶';
+      this.playBtn.textContent = '▶';
     }
   }
 
@@ -182,12 +97,11 @@ class PlayerControls extends HTMLElement {
    */
   setLoopState(isLooping) {
     this.isLooping = isLooping;
-    const loopBtn = this.shadowRoot.querySelector('.loop-btn');
 
     if (isLooping) {
-      loopBtn.classList.add('active');
+      this.loopBtn.classList.add('active');
     } else {
-      loopBtn.classList.remove('active');
+      this.loopBtn.classList.remove('active');
     }
   }
 
@@ -197,15 +111,11 @@ class PlayerControls extends HTMLElement {
    */
   setShuffleState(isShuffling) {
     this.isShuffling = isShuffling;
-    const shuffleBtn = this.shadowRoot.querySelector('.shuffle-btn');
 
     if (isShuffling) {
-      shuffleBtn.classList.add('active');
+      this.shuffleBtn.classList.add('active');
     } else {
-      shuffleBtn.classList.remove('active');
+      this.shuffleBtn.classList.remove('active');
     }
   }
 }
-
-// Register the custom element
-customElements.define('player-controls', PlayerControls);

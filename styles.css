@@ -158,6 +158,69 @@ input:focus {
 }
 
 /* ============================================
+   PLAYER CONTROLS
+   ============================================ */
+
+#playerControls {
+    display: block;
+}
+
+.player-controls .controls {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+.player-controls .control-btn {
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 0.4rem 1.2rem;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+    flex: 1;
+    max-width: 52px;
+}
+
+.player-controls .control-btn:hover {
+    background-color: #333;
+    border-color: #555;
+}
+
+.player-controls .control-btn:active {
+    background-color: #252525;
+}
+
+.player-controls .control-btn--primary {
+    background-color: #4a9eff;
+    border-color: #4a9eff;
+    color: #000;
+    font-weight: 600;
+}
+
+.player-controls .control-btn--primary:hover {
+    background-color: #5aafff;
+    border-color: #5aafff;
+}
+
+.player-controls .control-btn--primary:active {
+    background-color: #3a8eef;
+    border-color: #3a8eef;
+}
+
+.player-controls .control-btn.active {
+    background-color: #4a9eff;
+    border-color: #4a9eff;
+    color: #000;
+}
+
+.player-controls .control-btn.active:hover {
+    background-color: #5aafff;
+    border-color: #5aafff;
+}
+
+/* ============================================
    PROGRESS BAR
    ============================================ */
 

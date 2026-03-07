@@ -45,14 +45,15 @@ const DOM = {
     audio: document.getElementById('audioElement'),
     fileSelector: document.querySelector('file-selector'),
     playlistView: document.querySelector('playlist-view'),
-    playerControls: document.querySelector('player-controls'),
+    playerControlsContainer: document.querySelector('#playerControls'),
     progressBarContainer: document.querySelector('#progressBar'),
     nowPlayingInfo: document.querySelector('now-playing-info'),
     libraryBrowser: document.querySelector('library-browser'),
 };
 
-// Initialize progress bar after DOM is ready
+// Initialize components after DOM is ready
 let progressBar = null;
+let playerControls = null;
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -181,7 +182,7 @@ async function handleFilesSelected(event) {
     playerState.isShuffling = false;
     playerState.playlist = sorted.map(t => t.file);
     playerState.playbackReady = true;  // File objects are loaded, playback is ready
-    DOM.playerControls.setShuffleState(false);
+    playerControls.setShuffleState(false);
 
     // If this is the first file, select it
     if (playerState.currentIndex === -1 && playerState.playlist.length > 0) {
@@ -198,7 +199,7 @@ async function handleFilesSelected(event) {
     DOM.playlistView.setTracks(playerState.displayedTracks, null, true, playerState.sortedLibrary);
     DOM.fileSelector.updateFileCount(playerState.playlist.length);
     DOM.playlistView.setCurrentTrack(playerState.currentIndex);
-    DOM.playerControls.setPlayState(playerState.isPlaying);
+    playerControls.setPlayState(playerState.isPlaying);
 
     // Update now-playing
     if (playerState.currentIndex >= 0 && playerState.currentIndex < playerState.playlist.length) {
@@ -270,7 +271,7 @@ function handleLibraryFilterChanged(event) {
     playerState.originalDisplayed = [];
     playerState.isShuffling = false;
     playerState.playlist = sorted.map(t => t.file);
-    DOM.playerControls.setShuffleState(false);
+    playerControls.setShuffleState(false);
 
     // Try to keep current track active in new view
     const newIndex = currentFile ? playerState.playlist.indexOf(currentFile) : -1;
@@ -466,7 +467,7 @@ function handleSeek(event) {
  */
 function toggleLoop() {
     playerState.isLooping = !playerState.isLooping;
-    DOM.playerControls.setLoopState(playerState.isLooping);
+    playerControls.setLoopState(playerState.isLooping);
 }
 
 /**
@@ -763,7 +764,7 @@ function toggleShuffle() {
 
     console.time('toggleShuffle-updateUI');
     // Update UI with full library for global search
-    DOM.playerControls.setShuffleState(playerState.isShuffling);
+    playerControls.setShuffleState(playerState.isShuffling);
     DOM.playlistView.setTracks(playerState.displayedTracks, null, true, playerState.sortedLibrary);
     if (playerState.currentIndex >= 0) {
         DOM.playlistView.setCurrentTrack(playerState.currentIndex);
@@ -822,7 +823,7 @@ function onTrackEnd() {
  */
 function onPlayPauseChange() {
     playerState.isPlaying = !DOM.audio.paused;
-    DOM.playerControls.setPlayState(playerState.isPlaying);
+    playerControls.setPlayState(playerState.isPlaying);
 
     // Cancel animation frame if paused
     if (DOM.audio.paused && animationFrameId) {
@@ -865,7 +866,7 @@ function updateAllComponents() {
     }
 
     // Update play button
-    DOM.playerControls.setPlayState(playerState.isPlaying);
+    playerControls.setPlayState(playerState.isPlaying);
 }
 
 // ============================================
@@ -973,11 +974,11 @@ document.getElementById('playlistModal').addEventListener('click', (e) => {
 });
 
 // Player controls events
-DOM.playerControls.addEventListener('play-pause', togglePlayPause);
-DOM.playerControls.addEventListener('next-track', playNextTrack);
-DOM.playerControls.addEventListener('previous-track', playPreviousTrack);
-DOM.playerControls.addEventListener('toggle-loop', toggleLoop);
-DOM.playerControls.addEventListener('toggle-shuffle', toggleShuffle);
+DOM.playerControlsContainer.addEventListener('play-pause', togglePlayPause);
+DOM.playerControlsContainer.addEventListener('next-track', playNextTrack);
+DOM.playerControlsContainer.addEventListener('previous-track', playPreviousTrack);
+DOM.playerControlsContainer.addEventListener('toggle-loop', toggleLoop);
+DOM.playerControlsContainer.addEventListener('toggle-shuffle', toggleShuffle);
 
 // Progress bar events
 DOM.progressBarContainer.addEventListener('seek', handleSeek);
@@ -1448,8 +1449,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Set default volume
     DOM.audio.volume = 1.0;
 
-    // Initialize progress bar
+    // Initialize components
     progressBar = new ProgressBar(DOM.progressBarContainer);
+    playerControls = new PlayerControls(DOM.playerControlsContainer);
 
     // Try to load from cached snapshot first (instant, no scanning)
     updateLoadingProgress('Loading library...');
