@@ -241,7 +241,7 @@ class PlaylistView {
       if (!tracksByAlbum[album]) {
         tracksByAlbum[album] = [];
       }
-      tracksByAlbum[album].push({ track, idx, display Idx: trackIndex });
+      tracksByAlbum[album].push({ track, idx, displayIdx: trackIndex });
       trackIndex++;
     });
 
