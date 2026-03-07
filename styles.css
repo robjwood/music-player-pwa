@@ -158,6 +158,116 @@ input:focus {
 }
 
 /* ============================================
+   FILE SELECTOR
+   ============================================ */
+
+#fileSelector {
+    padding: 1.5rem;
+    border-bottom: 1px solid #333;
+}
+
+.file-selector-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.file-selector .folder-btn,
+.file-selector .clear-btn {
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    font-family: inherit;
+}
+
+.file-selector .folder-btn:hover {
+    background-color: #333;
+    border-color: #555;
+}
+
+.file-selector .folder-btn:active {
+    background-color: #252525;
+}
+
+.file-selector .folder-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.file-selector .clear-btn {
+    background-color: #8b3a3a;
+    border: 1px solid #a84949;
+    font-size: 0.9rem;
+}
+
+.file-selector .clear-btn:hover {
+    background-color: #a84949;
+    border-color: #c85959;
+}
+
+.file-selector .clear-btn:active {
+    background-color: #743030;
+}
+
+.file-selector .clear-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.file-selector .file-count {
+    font-size: 0.9rem;
+    color: #888;
+}
+
+.restore-banner {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    background-color: #2a3a2a;
+    border: 1px solid #4a7a4a;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #d0e0d0;
+    font-size: 0.95rem;
+}
+
+.restore-banner strong {
+    color: #a0d0a0;
+}
+
+.restore-banner .restore-btn,
+.restore-banner .dismiss-btn {
+    background-color: #3a5a3a;
+    border: 1px solid #5a8a5a;
+    color: #d0e0d0;
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.85rem;
+}
+
+.restore-banner .restore-btn:hover {
+    background-color: #4a7a4a;
+    border-color: #7aaa7a;
+}
+
+.restore-banner .dismiss-btn {
+    margin-left: auto;
+    background-color: transparent;
+    border: none;
+    color: #888;
+    padding: 0.2rem 0.4rem;
+}
+
+.restore-banner .dismiss-btn:hover {
+    color: #aaa;
+}
+
+/* ============================================
    NOW PLAYING INFO
    ============================================ */
 

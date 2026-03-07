@@ -279,7 +279,17 @@
     </style>
     <h2>Folder Management</h2>
     <div class="dialog-content">
-      <file-selector></file-selector>
+      <div id="fileSelector" class="file-selector">
+        <div class="file-selector-controls">
+          <button class="folder-btn" aria-label="Select folder">
+            📁 Select Folder
+          </button>
+          <button class="clear-btn" aria-label="Clear playlist">
+            ✕ Clear
+          </button>
+          <div class="file-count">No files selected</div>
+        </div>
+      </div>
     </div>
     <div class="dialog-buttons">
       <button type="button" id="closeFoldersDialog">Close</button>
