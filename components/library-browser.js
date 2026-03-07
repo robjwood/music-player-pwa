@@ -1,1 +1,500 @@
+/**
+ * LIBRARY BROWSER COMPONENT
+ *
+ * Left sidebar that organizes the library by Artists or Albums.
+ * Allows hierarchical browsing and filtering of the playlist.
+ *
+ * Usage:
+ *   <library-browser></library-browser>
+ *
+ * Methods:
+ *   setLibrary(tracks) - Set the library and reset to Artists view
+ *
+ * Events:
+ *   library-filter-changed - Emitted with { tracks: filteredTracks }
+ */
 
+class LibraryBrowser extends HTMLElement {
+    constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+
+        this.library = []; // Track[] — full library with metadata
+        this.playlists = []; // Playlist[] — user-created playlists
+        this.selectedArtist = null; // currently selected artist name
+        this.selectedAlbum = null; // currently selected album name
+        this.selectedPlaylist = null; // currently selected playlist ID
+        this.view = 'artists'; // Default view: 'artists' or 'playlists'
+    }
+
+    connectedCallback() {
+        this.render();
+        this.setupEventListeners();
+        // Initialize with artists view selected
+        this.switchView('artists');
+    }
+
+    /**
+     * Render the component's HTML and styles
+     */
+    render() {
+        this.shadowRoot.innerHTML = `
+            <style>
+                :host {
+                    display: block;
+                    height: 100%;
+                    overflow: hidden;
+                    background-color: #1a1a1a;
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .library-header {
+                    padding: 0.75rem 1rem;
+                    border-bottom: 1px solid #333;
+                    background-color: #0a0a0a;
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    color: #888;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .library-header:hover {
+                    background-color: #1a1a1a;
+                }
+
+                .library-header.active {
+                    color: #4a9eff;
+                    border-bottom-color: #4a9eff;
+                }
+
+                .entity-list {
+                    flex: 1;
+                    overflow-y: auto;
+                    padding: 0.5rem;
+                }
+
+                .entity-item {
+                    padding: 0.5rem;
+                    margin: 0.25rem 0;
+                    border-left: 2px solid transparent;
+                    cursor: pointer;
+                    color: #c0c0c0;
+                    font-size: 0.9rem;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    transition: all 0.1s ease;
+                }
+
+                .entity-item:hover {
+                    background-color: #222;
+                }
+
+                .entity-item.active {
+                    border-left-color: #4a9eff;
+                    background-color: #1a2a3a;
+                    color: #4a9eff;
+                    font-weight: 600;
+                }
+
+                .no-library {
+                    padding: 1rem;
+                    color: #666;
+                    font-size: 0.9rem;
+                    text-align: center;
+                }
+
+                .album-item {
+                    padding: 0.3rem 0.5rem 0.3rem 1.75rem;
+                    font-size: 0.82rem;
+                    color: #888;
+                    border-left: 2px solid transparent;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    transition: all 0.1s ease;
+                }
+
+                .album-item:hover {
+                    color: #bbb;
+                    background: #1e1e1e;
+                }
+
+                .album-item.active {
+                    color: #4a9eff;
+                    border-left-color: #4a9eff;
+                }
+
+                ::-webkit-scrollbar {
+                    width: 6px;
+                }
+
+                ::-webkit-scrollbar-track {
+                    background-color: transparent;
+                }
+
+                ::-webkit-scrollbar-thumb {
+                    background-color: #444;
+                }
+
+                ::-webkit-scrollbar-thumb:hover {
+                    background-color: #555;
+                }
+            </style>
+
+            <div style="display: flex; border-bottom: 1px solid #333;">
+                <div class="library-header" style="flex: 1; border: none; border-bottom: 2px solid transparent; margin: 0; padding: 0.6rem 1rem;" data-view="artists">
+                    Artist / Album
+                </div>
+                <div class="library-header" style="flex: 1; border: none; border-bottom: 2px solid transparent; margin: 0; padding: 0.6rem 1rem;" data-view="playlists">
+                    Playlists
+                </div>
+            </div>
+            <div class="entity-list"></div>
+        `;
+    }
+
+    /**
+     * Setup event listeners for view switching
+     */
+    setupEventListeners() {
+        const viewHeaders = this.shadowRoot.querySelectorAll('[data-view]');
+        viewHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                const view = header.dataset.view;
+                this.switchView(view);
+            });
+        });
+    }
+
+    /**
+     * Switch between Artists and Playlists view
+     * @param {string} view - 'artists' or 'playlists'
+     */
+    switchView(view) {
+        this.view = view;
+        this.selectedArtist = null;
+        this.selectedAlbum = null;
+        this.selectedPlaylist = null;
+
+        // Update active tab styling
+        const headers = this.shadowRoot.querySelectorAll('[data-view]');
+        headers.forEach(h => {
+            if (h.dataset.view === view) {
+                h.style.borderBottomColor = '#4a9eff';
+                h.style.color = '#4a9eff';
+            } else {
+                h.style.borderBottomColor = 'transparent';
+                h.style.color = '#888';
+            }
+        });
+
+        this.renderEntityList();
+        this.emitFilterChanged(this.library);
+    }
+
+    /**
+     * Set the library and render artist/album view
+     * @param {Track[]} tracks
+     */
+    setLibrary(tracks) {
+        this.library = tracks;
+        this.selectedArtist = null;
+        this.selectedAlbum = null;
+        this.view = 'artists';
+
+        this.renderEntityList();
+
+        // Emit library-filter-changed with all tracks
+        this.emitFilterChanged(tracks);
+    }
+
+    /**
+     * Set the playlists to display
+     * @param {object[]} playlists - Array of playlist objects
+     */
+    setPlaylists(playlists) {
+        this.playlists = playlists;
+    }
+
+    /**
+     * Render the artist/album hierarchy or playlist list based on current view
+     */
+    renderEntityList() {
+        const listContainer = this.shadowRoot.querySelector('.entity-list');
+
+        if (this.view === 'playlists') {
+            this.renderPlaylistList();
+            return;
+        }
+
+        // Artists view
+        if (this.library.length === 0) {
+            listContainer.innerHTML = '<div class="no-library">No library loaded</div>';
+            return;
+        }
+
+        // Extract unique artists
+        const artistSet = new Set();
+        this.library.forEach((track) => {
+            if (track.artist) artistSet.add(track.artist);
+        });
+        const artists = Array.from(artistSet).sort();
+
+        // Render artists with expandable albums
+        let html = '';
+        artists.forEach((artist, idx) => {
+            html += `<div class="entity-item ${this.selectedArtist === artist ? 'active' : ''}" data-entity="${idx}">
+                ${this.escapeHtml(artist)}
+            </div>`;
+
+            // If artist is selected, show their albums indented below
+            if (this.selectedArtist === artist) {
+                const artistTracks = this.library.filter(t => t.artist === artist);
+                const albumSet = new Set();
+                const albumYear = {};
+
+                artistTracks.forEach(t => {
+                    if (t.album) {
+                        albumSet.add(t.album);
+                        const yr = parseInt(t.year, 10);
+                        if (!isNaN(yr)) {
+                            if (albumYear[t.album] === undefined || yr < albumYear[t.album]) {
+                                albumYear[t.album] = yr;
+                            }
+                        }
+                    }
+                });
+
+                const albums = Array.from(albumSet).sort((a, b) => {
+                    const yearA = albumYear[a] ?? 9999;
+                    const yearB = albumYear[b] ?? 9999;
+                    return yearA !== yearB ? yearA - yearB : a.localeCompare(b);
+                });
+
+                albums.forEach((album, albumIdx) => {
+                    html += `<div class="album-item ${this.selectedAlbum === album ? 'active' : ''}" data-album="${albumIdx}">
+                        ${this.escapeHtml(album)}
+                    </div>`;
+                });
+            }
+        });
+
+        listContainer.innerHTML = html;
+
+        // Add event listeners
+        const artistItems = listContainer.querySelectorAll('.entity-item');
+        artistItems.forEach((item) => {
+            item.addEventListener('click', () => {
+                const artistName = artists[parseInt(item.dataset.entity, 10)];
+                this.selectEntity(artistName);
+            });
+        });
+
+        const albumItems = listContainer.querySelectorAll('.album-item');
+        albumItems.forEach((item) => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Get albums list for the current artist
+                const artistTracks = this.library.filter(t => t.artist === this.selectedArtist);
+                const albumSet = new Set();
+                const albumYear = {};
+
+                artistTracks.forEach(t => {
+                    if (t.album) {
+                        albumSet.add(t.album);
+                        const yr = parseInt(t.year, 10);
+                        if (!isNaN(yr)) {
+                            if (albumYear[t.album] === undefined || yr < albumYear[t.album]) {
+                                albumYear[t.album] = yr;
+                            }
+                        }
+                    }
+                });
+
+                const albums = Array.from(albumSet).sort((a, b) => {
+                    const yearA = albumYear[a] ?? 9999;
+                    const yearB = albumYear[b] ?? 9999;
+                    return yearA !== yearB ? yearA - yearB : a.localeCompare(b);
+                });
+
+                const albumName = albums[parseInt(item.dataset.album, 10)];
+                this.selectAlbum(albumName);
+            });
+        });
+    }
+
+    /**
+     * Select an artist and filter the library
+     * @param {string} artistName
+     */
+    selectEntity(artistName) {
+        // If clicking the same artist, collapse it
+        if (this.selectedArtist === artistName) {
+            this.selectedArtist = null;
+            this.selectedAlbum = null;
+            this.renderEntityList();
+            // Emit all tracks
+            this.emitFilterChanged(this.library);
+        } else {
+            // Switch to different artist
+            this.selectedArtist = artistName;
+            this.selectedAlbum = null;
+            this.renderEntityList();
+            // Emit all tracks by this artist
+            const filteredTracks = this.library.filter((track) => track.artist === artistName);
+            this.emitFilterChanged(filteredTracks);
+        }
+    }
+
+    /**
+     * Select an album within an artist (artists view only)
+     * @param {string} albumName
+     */
+    selectAlbum(albumName) {
+        this.selectedAlbum = albumName;
+        this.renderEntityList();
+
+        // Filter by artist AND album
+        const filteredTracks = this.library.filter(
+            (track) => track.artist === this.selectedArtist && track.album === albumName
+        );
+        this.emitFilterChanged(filteredTracks);
+    }
+
+    /**
+     * Render the playlist list
+     */
+    renderPlaylistList() {
+        const listContainer = this.shadowRoot.querySelector('.entity-list');
+
+        if (this.playlists.length === 0) {
+            listContainer.innerHTML = '<div class="no-library">No playlists created yet</div>';
+            return;
+        }
+
+        let html = '';
+        this.playlists.forEach((playlist, idx) => {
+            const trackCount = playlist.tracks ? playlist.tracks.length : 0;
+            html += `<div class="entity-item ${this.selectedPlaylist === playlist.id ? 'active' : ''}" data-playlist="${idx}" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="flex: 1;">
+                    ${this.escapeHtml(playlist.name)}
+                    <span style="color: #666; font-size: 0.75rem; margin-left: 0.5rem;">(${trackCount})</span>
+                </span>
+                <button class="delete-playlist-btn" data-playlist-id="${playlist.id}" title="Delete playlist" style="background: #2a2a2a; border: 1px solid #444; color: #666; cursor: pointer; padding: 0.3rem 0.5rem; border-radius: 3px; font-size: 0.85rem; flex-shrink: 0;">✕</button>
+            </div>`;
+        });
+
+        listContainer.innerHTML = html;
+        console.log('📋 renderPlaylistList called with', this.playlists.length, 'playlists');
+
+        // Add event listeners for playlist selection
+        const playlistItems = listContainer.querySelectorAll('.entity-item');
+        playlistItems.forEach((item) => {
+            // Click on item to select (but not on delete button)
+            item.addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-playlist-btn')) {
+                    return; // Let delete button handler take over
+                }
+                const playlistIdx = parseInt(item.dataset.playlist, 10);
+                const playlist = this.playlists[playlistIdx];
+                this.selectPlaylist(playlist);
+            });
+        });
+
+        // Add event listeners for delete buttons
+        const deleteButtons = listContainer.querySelectorAll('.delete-playlist-btn');
+        deleteButtons.forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const playlistId = btn.dataset.playlistId;
+                this.dispatchEvent(new CustomEvent('delete-playlist', {
+                    detail: { playlistId },
+                    bubbles: true,
+                    composed: true
+                }));
+            });
+
+            // Hover effect for delete button
+            btn.addEventListener('mouseenter', () => {
+                btn.style.color = '#e74c3c';
+            });
+            btn.addEventListener('mouseleave', () => {
+                btn.style.color = '#666';
+            });
+        });
+    }
+
+    /**
+     * Select a playlist and filter the library to its tracks
+     * @param {object} playlist
+     */
+    selectPlaylist(playlist) {
+        // If clicking the same playlist, deselect it
+        if (this.selectedPlaylist === playlist.id) {
+            this.selectedPlaylist = null;
+            this.renderPlaylistList();
+            // Emit all tracks
+            this.emitFilterChanged(this.library, null);
+        } else {
+            // Switch to different playlist
+            this.selectedPlaylist = playlist.id;
+            this.renderPlaylistList();
+
+            // Build filtered tracks, preferring library matches but falling back to metadata
+            const filteredTracks = playlist.tracks.map(pt => {
+                // Try to find this track in the library
+                const libraryTrack = this.library.find(t => t.file.name === pt.fileName);
+                if (libraryTrack) {
+                    return libraryTrack;
+                }
+                // If not found in library, use playlist metadata with synthetic file object
+                return {
+                    file: { name: pt.fileName },
+                    title: pt.title,
+                    artist: pt.artist,
+                    album: pt.album,
+                    track: pt.track,
+                    year: pt.year,
+                    duration: pt.duration,
+                    unavailable: true,  // Mark as unavailable since file is not in library
+                };
+            });
+
+            this.emitFilterChanged(filteredTracks, playlist.id);
+        }
+    }
+
+    /**
+     * Emit library-filter-changed event
+     * @param {Track[]} filteredTracks
+     * @param {string} playlistId - Optional playlist ID if filtering by playlist
+     */
+    emitFilterChanged(filteredTracks, playlistId = null) {
+        const event = new CustomEvent('library-filter-changed', {
+            detail: { tracks: filteredTracks, playlistId },
+            bubbles: true,
+            composed: true,
+        });
+        this.dispatchEvent(event);
+    }
+
+    /**
+     * Escape HTML special characters (XSS protection)
+     * @param {string} text
+     * @returns {string}
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+
+// Register the custom element
+customElements.define('library-browser', LibraryBrowser);

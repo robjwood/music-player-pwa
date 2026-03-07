@@ -48,7 +48,7 @@ const DOM = {
     playerControlsContainer: document.querySelector('#playerControls'),
     progressBarContainer: document.querySelector('#progressBar'),
     nowPlayingInfoContainer: document.querySelector('#nowPlayingInfo'),
-    libraryBrowserContainer: document.querySelector('#libraryBrowser'),
+    libraryBrowser: document.querySelector('library-browser'),
 };
 
 // Initialize components after DOM is ready
@@ -57,7 +57,6 @@ let playerControls = null;
 let nowPlayingInfo = null;
 let fileSelector = null;
 let playlistView = null;
-let libraryBrowser = null;
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -194,7 +193,7 @@ async function handleFilesSelected(event) {
     }
 
     // Set library in browser (will emit library-filter-changed with all tracks)
-    libraryBrowser.setLibrary(playerState.library);
+    DOM.libraryBrowser.setLibrary(playerState.library);
 
     // Load and set playlists
     await loadAndSetPlaylists();
@@ -231,7 +230,7 @@ function handleClearPlaylist() {
     playerState.lastLoadedFileName = null;  // Reset track filename for position resumption
 
     // Clear library browser
-    libraryBrowser.setLibrary([]);
+    DOM.libraryBrowser.setLibrary([]);
 
     // Clear persistence (but not volume preference)
     MusicPlayerDB.clearAllFolderHandles().catch(err => console.warn('Failed to clear folder handle:', err));
@@ -312,11 +311,11 @@ async function loadAndSetPlaylists() {
             await getOrCreateLikedPlaylist();
             // Reload to include the newly created Liked playlist
             const updatedPlaylists = await MusicPlayerDB.getPlaylists();
-            libraryBrowser.setPlaylists(updatedPlaylists);
+            DOM.libraryBrowser.setPlaylists(updatedPlaylists);
             return;
         }
 
-        libraryBrowser.setPlaylists(playlists);
+        DOM.libraryBrowser.setPlaylists(playlists);
     } catch (err) {
         console.warn('Failed to load playlists:', err);
     }
@@ -916,8 +915,8 @@ DOM.fileSelectorContainer.addEventListener('files-selected', handleFilesSelected
 DOM.fileSelectorContainer.addEventListener('clear-playlist', handleClearPlaylist);
 
 // Library browser events
-DOM.libraryBrowserContainer.addEventListener('library-filter-changed', handleLibraryFilterChanged);
-DOM.libraryBrowserContainer.addEventListener('delete-playlist', handleDeletePlaylist);
+DOM.libraryBrowser.addEventListener('library-filter-changed', handleLibraryFilterChanged);
+DOM.libraryBrowser.addEventListener('delete-playlist', handleDeletePlaylist);
 
 // Playlist events
 DOM.playlistViewContainer.addEventListener('track-selected', handleTrackSelected);
@@ -1087,7 +1086,7 @@ async function loadFromSnapshot() {
         playerState.fromFolder = true;
 
         // Set library in browser
-        libraryBrowser.setLibrary(playerState.library);
+        DOM.libraryBrowser.setLibrary(playerState.library);
         await loadAndSetPlaylists();
 
         // Restore last track index
@@ -1315,7 +1314,7 @@ async function restoreFolderFromHandle(handle) {
             playerState.displayedTracks = sorted;
             playerState.playlist = sorted.map(t => t.file);
 
-            libraryBrowser.setLibrary(playerState.library);
+            DOM.libraryBrowser.setLibrary(playerState.library);
             await loadAndSetPlaylists();
 
             // Restore the last track index
@@ -1357,7 +1356,7 @@ async function restoreFolderFromHandle(handle) {
         playerState.fromFolder = true;
 
         // Set library in browser
-        libraryBrowser.setLibrary(playerState.library);
+        DOM.libraryBrowser.setLibrary(playerState.library);
         await loadAndSetPlaylists();
 
         // Restore the last track index (into the sorted order)
@@ -1453,7 +1452,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     nowPlayingInfo = new NowPlayingInfo(DOM.nowPlayingInfoContainer);
     fileSelector = new FileSelector(DOM.fileSelectorContainer);
     playlistView = new PlaylistView(DOM.playlistViewContainer);
-    libraryBrowser = new LibraryBrowser(DOM.libraryBrowserContainer);
 
     // Try to load from cached snapshot first (instant, no scanning)
     updateLoadingProgress('Loading library...');
