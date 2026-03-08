@@ -32,6 +32,7 @@ const playerState = {
   pendingTrack: null,     // Track waiting to be added to a playlist
   pendingTracks: null,    // Multiple tracks waiting to be added to a playlist
   currentPlaylistId: null,// ID of the currently selected playlist (if any)
+  selectedPlaylistIds: [],// Playlist IDs selected in the modal for multi-add
   sortedLibrary: [],      // Cached sorted version of full library (for fast tab switching)
   playbackReady: false,   // Are File objects loaded and playback available?
   lastLoadedFileName: null,  // Filename of the last loaded track (for position resumption)
@@ -555,7 +556,7 @@ async function loadAndShowPlaylistModal(isMultiple = false) {
 }
 
 /**
- * Show the playlist selection modal
+ * Show the playlist selection modal with checkbox selection for multiple playlists
  * @param {boolean} isMultiple - Whether adding multiple tracks
  */
 function showPlaylistModal(isMultiple = false) {
@@ -563,30 +564,81 @@ function showPlaylistModal(isMultiple = false) {
   const modalTitle = modal.querySelector('h2');
   const playlistList = document.getElementById('playlistList');
   const newPlaylistInput = document.getElementById('newPlaylistName');
+  const createBtn = document.getElementById('createPlaylistBtn');
 
   // Update title based on single or multiple tracks
   if (isMultiple) {
-    modalTitle.textContent = `Add ${playerState.pendingTracks?.length || 0} Tracks to Playlist`;
+    modalTitle.textContent = `Add ${playerState.pendingTracks?.length || 0} Tracks to Playlist(s)`;
     newPlaylistInput.placeholder = 'Or create new playlist for these tracks...';
   } else {
-    modalTitle.textContent = 'Add to Playlist';
+    modalTitle.textContent = 'Add to Playlist(s)';
     newPlaylistInput.placeholder = 'Or create new playlist...';
   }
 
-  // Clear previous list
+  // Clear previous list and reset selection
   playlistList.innerHTML = '';
   newPlaylistInput.value = '';
+  playerState.selectedPlaylistIds = [];
 
-  // Show existing playlists
+  // Show existing playlists sorted alphabetically with checkboxes
   if (playerState.playlists.length > 0) {
-    playerState.playlists.forEach(p => {
+    // Sort playlists alphabetically by name
+    const sortedPlaylists = [...playerState.playlists].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+
+    sortedPlaylists.forEach(p => {
       const div = document.createElement('div');
       div.className = 'playlist-option';
-      div.textContent = `${p.name} (${p.tracks.length})`;
-      div.addEventListener('click', async () => {
-        await addTrackToPlaylist(p.id);
-        modal.close();
+      div.style.display = 'flex';
+      div.style.alignItems = 'center';
+      div.style.gap = '0.6rem';
+      div.style.cursor = 'pointer';
+      div.style.padding = '0.6rem';
+      div.style.margin = '0.4rem 0';
+      div.style.background = '#1a1a1a';
+      div.style.border = '1px solid #333';
+      div.style.borderRadius = '4px';
+      div.style.transition = 'all 0.2s';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = p.id;
+      checkbox.style.cursor = 'pointer';
+      checkbox.style.width = '18px';
+      checkbox.style.height = '18px';
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          playerState.selectedPlaylistIds.push(p.id);
+        } else {
+          playerState.selectedPlaylistIds = playerState.selectedPlaylistIds.filter(id => id !== p.id);
+        }
       });
+
+      const label = document.createElement('label');
+      label.style.cursor = 'pointer';
+      label.style.flex = '1';
+      label.textContent = `${p.name} (${p.tracks.length})`;
+      label.addEventListener('click', (e) => {
+        if (e.target !== checkbox) {
+          checkbox.checked = !checkbox.checked;
+          checkbox.dispatchEvent(new Event('change'));
+        }
+      });
+
+      div.appendChild(checkbox);
+      div.appendChild(label);
+
+      // Hover effect
+      div.addEventListener('mouseenter', () => {
+        div.style.background = '#2a2a2a';
+        div.style.borderColor = '#555';
+      });
+      div.addEventListener('mouseleave', () => {
+        div.style.background = '#1a1a1a';
+        div.style.borderColor = '#333';
+      });
+
       playlistList.appendChild(div);
     });
   } else {
@@ -595,6 +647,9 @@ function showPlaylistModal(isMultiple = false) {
     msg.textContent = 'No playlists yet. Create one below.';
     playlistList.appendChild(msg);
   }
+
+  // Update button text
+  createBtn.textContent = 'Add to Selected';
 
   modal.showModal();
 }
@@ -651,23 +706,80 @@ async function addTrackToPlaylist(playlistId) {
 }
 
 /**
- * Create a new playlist and add track
+ * Create a new playlist and/or add tracks to selected playlists
  */
 async function createAndAddPlaylist() {
   const playlistName = document.getElementById('newPlaylistName').value.trim();
-  if (!playlistName) {
-    alert('Please enter a playlist name');
+  const selectedIds = playerState.selectedPlaylistIds || [];
+
+  // Check if at least one playlist is selected or a name is provided
+  if (selectedIds.length === 0 && !playlistName) {
+    alert('Please select playlists or create a new one');
     return;
   }
 
   try {
-    const playlistId = await MusicPlayerDB.createPlaylist(playlistName);
-    await addTrackToPlaylist(playlistId);
-    // addTrackToPlaylist already reloads playlists
+    const tracksToAdd = playerState.pendingTracks || (playerState.pendingTrack ? [playerState.pendingTrack] : []);
+    if (tracksToAdd.length === 0) return;
+
+    const playlistsToAddTo = [...selectedIds];
+
+    // Create new playlist if name provided
+    if (playlistName) {
+      const newPlaylistId = await MusicPlayerDB.createPlaylist(playlistName);
+      playlistsToAddTo.push(newPlaylistId);
+    }
+
+    // Add tracks to all selected/created playlists
+    for (const playlistId of playlistsToAddTo) {
+      for (const track of tracksToAdd) {
+        await MusicPlayerDB.addTrackToPlaylist(playlistId, track);
+      }
+    }
+
+    const playlistCount = playlistsToAddTo.length;
+    alert(`Added ${tracksToAdd.length} track${tracksToAdd.length > 1 ? 's' : ''} to ${playlistCount} playlist${playlistCount > 1 ? 's' : ''}!`);
+
+    playerState.pendingTrack = null;
+    playerState.pendingTracks = null;
+    playerState.selectedPlaylistIds = [];
+
+    // Reload playlists in sidebar
+    await loadAndSetPlaylists();
+
+    // If currently viewing a playlist, refresh it
+    if (playerState.currentPlaylistId) {
+      const currentPlaylist = await MusicPlayerDB.getPlaylist(playerState.currentPlaylistId);
+      if (currentPlaylist) {
+        const updatedTracks = currentPlaylist.tracks.map(pt => {
+          const libraryTrack = playerState.library.find(t => t.file.name === pt.fileName);
+          if (libraryTrack) {
+            return libraryTrack;
+          }
+          return {
+            file: { name: pt.fileName },
+            title: pt.title,
+            artist: pt.artist,
+            album: pt.album,
+            track: pt.track,
+            year: pt.year,
+            duration: pt.duration,
+            unavailable: true,
+          };
+        });
+
+        playerState.displayedTracks = updatedTracks;
+        playerState.playlist = updatedTracks.map(t => t.file);
+        playerState.currentIndex = -1;
+        DOM.playlistView.setTracks(updatedTracks, playerState.currentPlaylistId, true, playerState.sortedLibrary);
+        DOM.fileSelector.updateFileCount(playerState.playlist.length);
+      }
+    }
+
     document.getElementById('playlistModal').close();
   } catch (err) {
-    console.warn('Failed to create playlist:', err);
-    alert('Error creating playlist');
+    console.warn('Failed to add track(s) to playlist:', err);
+    alert('Error adding track(s) to playlist');
   }
 }
 
