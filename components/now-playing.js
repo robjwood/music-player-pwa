@@ -36,16 +36,18 @@ class NowPlayingInfo extends HTMLElement {
     this.likeBtn = this.querySelector('#likeTrackBtn');
     this.addBtn = this.querySelector('#addTrackBtn');
 
-    // Add click handler to info area to scroll to track
-    this.addEventListener('click', (e) => {
-      // Only trigger on info area, not button clicks
-      if (!e.target.classList.contains('now-playing-btn') && this.currentTrack) {
+    // Add click handler to info area to scroll to track in playlist
+    const infoDiv = this.querySelector('.now-playing-info');
+    if (infoDiv) {
+      infoDiv.addEventListener('click', () => {
+        // Dispatch scroll event for the app to listen to
         this.dispatchEvent(new CustomEvent('scroll-to-track', {
           bubbles: true,
           composed: true
         }));
-      }
-    });
+        console.log('Clicked track title - dispatching scroll-to-track event');
+      });
+    }
 
     // Add like button handler
     if (this.likeBtn) {

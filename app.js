@@ -1072,7 +1072,42 @@ DOM.playlistView.addEventListener('delete-track', handleDeleteTrackFromPlaylist)
 // Now playing events (add to playlist from player)
 DOM.nowPlayingInfo.addEventListener('scroll-to-track', () => {
   // Scroll the playlist view to show the currently playing track
-  DOM.playlistView.scrollCurrentTrackIntoView();
+  console.log('Received scroll-to-track event, scrolling to current track');
+
+  // Get the current track from the now-playing component (it always knows what's playing)
+  const currentTrack = DOM.nowPlayingInfo.currentTrack;
+  console.log('Current track from now-playing component:', currentTrack?.title, 'by', currentTrack?.artist);
+
+  // If no track is playing, do nothing
+  if (!currentTrack) {
+    console.log('No track currently playing');
+    return;
+  }
+
+  // If currently filtered by artist/album, clear the filter to show all tracks
+  if (playerState.currentPlaylistId) {
+    // Currently viewing a playlist - switch to full library view
+    console.log('Currently in playlist view, switching to full library');
+    playerState.displayedTracks = playerState.sortedLibrary;
+    playerState.playlist = playerState.sortedLibrary.map(t => t.file);
+    playerState.currentPlaylistId = null;
+    DOM.playlistView.setTracks(playerState.displayedTracks, null, false, playerState.sortedLibrary);
+  } else if (DOM.libraryBrowser) {
+    // Clear any artist/album filter in the library browser
+    console.log('Clearing library filter');
+    DOM.libraryBrowser.clearSelection();
+  }
+
+  // Select the artist in the left panel
+  if (currentTrack.artist && DOM.libraryBrowser) {
+    console.log(`Selecting artist: ${currentTrack.artist}`);
+    DOM.libraryBrowser.selectAndScrollToArtist(currentTrack.artist);
+  }
+
+  // Now scroll to the current track in the main view
+  setTimeout(() => {
+    DOM.playlistView.scrollCurrentTrackIntoView();
+  }, 100);
 });
 
 // Now playing buttons are handled by the <now-playing-info> Web Component

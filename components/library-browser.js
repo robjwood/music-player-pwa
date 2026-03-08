@@ -199,6 +199,75 @@ class LibraryBrowser extends HTMLElement {
     }
 
     /**
+     * Clear any artist/album/playlist selection and show all tracks
+     */
+    clearSelection() {
+        this.selectedArtist = null;
+        this.selectedAlbum = null;
+        this.selectedPlaylist = null;
+        this.renderEntityList();
+        this.emitFilterChanged(this.library);
+    }
+
+    /**
+     * Select an artist and scroll to it in the list
+     * @param {string} artistName - The artist to select
+     */
+    selectAndScrollToArtist(artistName) {
+        console.log(`[library-browser] selectAndScrollToArtist called with: "${artistName}"`);
+        console.log(`[library-browser] Current view: ${this.view}, Library size: ${this.library.length}`);
+
+        // Switch to Artists view if not already there
+        if (this.view !== 'artists') {
+            this.view = 'artists';
+            const headers = this.shadowRoot.querySelectorAll('[data-view]');
+            headers.forEach(h => {
+                if (h.dataset.view === 'artists') {
+                    h.style.borderBottomColor = '#4a9eff';
+                    h.style.color = '#4a9eff';
+                } else {
+                    h.style.borderBottomColor = 'transparent';
+                    h.style.color = '#888';
+                }
+            });
+            console.log('[library-browser] Switched to artists view');
+        }
+
+        // Select the artist
+        this.selectedArtist = artistName;
+        this.selectedAlbum = null;
+        this.selectedPlaylist = null;
+        console.log(`[library-browser] Set selectedArtist to: "${this.selectedArtist}"`);
+
+        // Re-render to show the artist selected
+        this.renderEntityList();
+        console.log('[library-browser] Called renderEntityList');
+
+        // Filter tracks by artist and emit
+        const filteredTracks = this.library.filter((track) => track.artist === artistName);
+        console.log(`[library-browser] Filtered ${filteredTracks.length} tracks for artist "${artistName}"`);
+        this.emitFilterChanged(filteredTracks);
+
+        // Scroll to the selected artist in the list
+        setTimeout(() => {
+            const listContainer = this.shadowRoot.querySelector('.entity-list');
+            if (listContainer) {
+                const artistItems = listContainer.querySelectorAll('.entity-item');
+                console.log(`[library-browser] Found ${artistItems.length} entity items in list`);
+                for (const item of artistItems) {
+                    const itemText = item.textContent.trim();
+                    // Check if this is the artist item (not an album item)
+                    if (!item.classList.contains('album-item') && itemText === artistName) {
+                        console.log(`[library-browser] Found and scrolling to artist: "${itemText}"`);
+                        item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        break;
+                    }
+                }
+            }
+        }, 50);
+    }
+
+    /**
      * Set the library and render artist/album view
      * @param {Track[]} tracks
      */

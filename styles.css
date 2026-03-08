@@ -693,6 +693,13 @@ playlist-view {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color 0.2s;
+  user-select: none;
+}
+
+.now-playing-info:hover .track-title {
+  color: #4a9eff;
 }
 
 .now-playing-info .track-artist {
@@ -701,6 +708,13 @@ playlist-view {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.now-playing-info:hover .track-artist {
+  color: #999;
 }
 
 /* ============================================
