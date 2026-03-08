@@ -5,7 +5,8 @@
       "Bash(node:*)",
       "Bash(sed -e '19,32d' -e '44,356d')",
       "Read(//tmp/**)",
-      "WebFetch(domain:gomakethings.com)"
+      "WebFetch(domain:gomakethings.com)",
+      "Bash(python3:*)"
     ]
   }
 }

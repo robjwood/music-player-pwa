@@ -54,6 +54,80 @@ class PlaylistView extends HTMLElement {
 
   connectedCallback() {
     this.setupEventListeners();
+    this.setupPlaylistDelegation();
+  }
+
+  /**
+   * Set up delegated event listener for playlist items
+   * Handles track selection, add-to-playlist, delete, and search result clicks
+   */
+  setupPlaylistDelegation() {
+    const playlistEl = this.querySelector('.playlist');
+    if (!playlistEl) return;
+
+    playlistEl.addEventListener('click', (e) => {
+      // Add-to-playlist button
+      if (e.target.classList.contains('add-playlist-btn')) {
+        e.stopPropagation();
+        const item = e.target.closest('[data-index]');
+        if (item) {
+          const index = parseInt(item.dataset.index, 10);
+          const track = this.tracks[index];
+          if (track) {
+            this.dispatchEvent(new CustomEvent('add-track-to-playlist', {
+              detail: { track },
+              bubbles: true,
+              composed: true
+            }));
+          }
+        }
+        return;
+      }
+
+      // Delete button
+      if (e.target.classList.contains('delete-track-btn')) {
+        e.stopPropagation();
+        const item = e.target.closest('[data-index]');
+        if (item) {
+          const index = parseInt(item.dataset.index, 10);
+          this.dispatchEvent(new CustomEvent('delete-track', {
+            detail: { index },
+            bubbles: true,
+            composed: true
+          }));
+        }
+        return;
+      }
+
+      // Search result artist filter
+      if (e.target.closest('[data-artist]')) {
+        const artistEl = e.target.closest('[data-artist]');
+        const artist = artistEl.dataset.artist;
+        this.searchSelectedArtist = this.searchSelectedArtist === artist ? null : artist;
+        this.renderPlaylist();
+        return;
+      }
+
+      // Search result album filter
+      if (e.target.closest('[data-album]')) {
+        const albumEl = e.target.closest('[data-album]');
+        const album = albumEl.dataset.album;
+        this.searchSelectedAlbum = this.searchSelectedAlbum === album ? null : album;
+        this.renderPlaylist();
+        return;
+      }
+
+      // Track selection (anywhere except buttons)
+      const item = e.target.closest('[data-index]');
+      if (item && !e.target.closest('button')) {
+        const index = parseInt(item.dataset.index, 10);
+        this.dispatchEvent(new CustomEvent('track-selected', {
+          detail: { index },
+          bubbles: true,
+          composed: true
+        }));
+      }
+    });
   }
 
   /**
@@ -236,14 +310,20 @@ class PlaylistView extends HTMLElement {
     const tracks = this.tracks;
 
     if (tracks.length === 0) {
-      playlistEl.innerHTML = '<div class="playlist-empty">No tracks loaded</div>';
+      playlistEl.replaceChildren();
+      const emptyEl = document.createElement('div');
+      emptyEl.className = 'playlist-empty';
+      emptyEl.textContent = 'No tracks loaded';
+      playlistEl.appendChild(emptyEl);
       return;
     }
 
-    let html = '';
-    let currentAlbum = null;
-    let albumDuration = 0;
-    let trackIndex = 0;
+    // Clear playlist
+    playlistEl.replaceChildren();
+
+    // Get template
+    const albumTemplate = document.getElementById('album-header-template');
+    const itemTemplate = document.getElementById('playlist-item-template');
 
     // Group tracks by album
     const tracksByAlbum = {};
@@ -252,8 +332,7 @@ class PlaylistView extends HTMLElement {
       if (!tracksByAlbum[album]) {
         tracksByAlbum[album] = [];
       }
-      tracksByAlbum[album].push({ track, idx, displayIdx: trackIndex });
-      trackIndex++;
+      tracksByAlbum[album].push({ track, idx });
     });
 
     // Render albums in order
@@ -264,29 +343,35 @@ class PlaylistView extends HTMLElement {
         albumDur += track.duration || 0;
       });
 
-      html += `<div class="album-header">
-        <div class="album-header-name">${this.escapeHtml(album)}</div>
-        <div class="album-header-duration">${formatDuration(albumDur)}</div>
-      </div>`;
+      // Clone and populate album header template
+      const headerEl = albumTemplate.content.cloneNode(true);
+      headerEl.querySelector('.album-header-name').textContent = album;
+      headerEl.querySelector('.album-header-duration').textContent = formatDuration(albumDur);
+      playlistEl.appendChild(headerEl);
 
+      // Render tracks for this album
       albumTracks.forEach(({ track, idx }) => {
-        const isActive = this.currentIndex === idx ? ' active' : '';
-        const isUnavailable = track.unavailable ? ' unavailable' : '';
         const trackNum = parseTrackNumber(track.track);
         const trackNumStr = trackNum ? String(trackNum).padStart(2, '0') : '--';
         const trackTitle = track.title || track.file.name.replace(/\.[^/.]+$/, '');
 
-        html += `<div class="playlist-item${isActive}${isUnavailable}" data-index="${idx}">
-          <span class="track-label">${trackNumStr}. ${this.escapeHtml(trackTitle)}</span>
-          <span class="track-meta">${track.year || ''} ${formatDuration(track.duration)}</span>
-          <button class="add-playlist-btn" title="Add to playlist">+</button>
-          <button class="delete-track-btn" title="Delete from playlist">✕</button>
-        </div>`;
+        // Clone and populate track item template
+        const itemEl = itemTemplate.content.cloneNode(true);
+        const itemDiv = itemEl.querySelector('.playlist-item');
+        itemDiv.dataset.index = idx;
+        if (this.currentIndex === idx) {
+          itemDiv.classList.add('active');
+        }
+        if (track.unavailable) {
+          itemDiv.classList.add('unavailable');
+        }
+
+        itemEl.querySelector('.track-label').textContent = `${trackNumStr}. ${trackTitle}`;
+        itemEl.querySelector('.track-meta').textContent = `${track.year || ''} ${formatDuration(track.duration)}`;
+
+        playlistEl.appendChild(itemEl);
       });
     });
-
-    playlistEl.innerHTML = html;
-    this.setupPlaylistItemListeners();
   }
 
   /**
@@ -299,49 +384,85 @@ class PlaylistView extends HTMLElement {
     const filteredTracks = this.getFilteredTracks();
 
     if (filteredTracks.length === 0) {
-      playlistEl.innerHTML = '<div class="playlist-empty">No results match your search</div>';
+      playlistEl.replaceChildren();
+      const emptyEl = document.createElement('div');
+      emptyEl.className = 'playlist-empty';
+      emptyEl.textContent = 'No results match your search';
+      playlistEl.appendChild(emptyEl);
       return;
     }
 
-    let html = '<div class="search-sections">';
+    // Clear playlist
+    playlistEl.replaceChildren();
+
+    // Get template
+    const resultTemplate = document.getElementById('search-result-item-template');
+
+    // Create sections container
+    const sectionsEl = document.createElement('div');
+    sectionsEl.className = 'search-sections';
 
     // Artists section
     if (artists.length > 0) {
-      html += `<div class="search-section">
-        <div class="search-section-header">🎤 Artists (${artists.length})</div>`;
+      const sectionEl = document.createElement('div');
+      sectionEl.className = 'search-section';
+
+      const headerEl = document.createElement('div');
+      headerEl.className = 'search-section-header';
+      headerEl.textContent = `🎤 Artists (${artists.length})`;
+      sectionEl.appendChild(headerEl);
+
       artists.forEach(artist => {
-        const isSelected = this.searchSelectedArtist === artist;
-        const className = `search-result-item artist-result${isSelected ? ' active' : ''}`;
-        html += `<div class="${className}" data-artist="${this.escapeHtml(artist)}">
-          <span class="search-result-main">
-            <span class="search-result-title">${this.escapeHtml(artist)}</span>
-          </span>
-        </div>`;
+        const itemEl = resultTemplate.content.cloneNode(true);
+        const resultDiv = itemEl.querySelector('.search-result-item');
+        resultDiv.className = 'search-result-item artist-result';
+        resultDiv.dataset.artist = artist;
+        if (this.searchSelectedArtist === artist) {
+          resultDiv.classList.add('active');
+        }
+        itemEl.querySelector('.search-result-title').textContent = artist;
+        itemEl.querySelector('.search-result-subtitle').style.display = 'none';
+        sectionEl.appendChild(itemEl);
       });
-      html += '</div>';
+
+      sectionsEl.appendChild(sectionEl);
     }
 
     // Albums section
     if (albums.length > 0) {
-      html += `<div class="search-section">
-        <div class="search-section-header">💿 Albums (${albums.length})</div>`;
+      const sectionEl = document.createElement('div');
+      sectionEl.className = 'search-section';
+
+      const headerEl = document.createElement('div');
+      headerEl.className = 'search-section-header';
+      headerEl.textContent = `💿 Albums (${albums.length})`;
+      sectionEl.appendChild(headerEl);
+
       albums.forEach(album => {
-        const isSelected = this.searchSelectedAlbum === album.name;
-        const className = `search-result-item album-result${isSelected ? ' active' : ''}`;
-        html += `<div class="${className}" data-album="${this.escapeHtml(album.name)}">
-          <span class="search-result-main">
-            <span class="search-result-title">${this.escapeHtml(album.name)}</span>
-            <span class="search-result-subtitle">${this.escapeHtml(album.artist)}</span>
-          </span>
-        </div>`;
+        const itemEl = resultTemplate.content.cloneNode(true);
+        const resultDiv = itemEl.querySelector('.search-result-item');
+        resultDiv.className = 'search-result-item album-result';
+        resultDiv.dataset.album = album.name;
+        if (this.searchSelectedAlbum === album.name) {
+          resultDiv.classList.add('active');
+        }
+        itemEl.querySelector('.search-result-title').textContent = album.name;
+        itemEl.querySelector('.search-result-subtitle').textContent = album.artist;
+        sectionEl.appendChild(itemEl);
       });
-      html += '</div>';
+
+      sectionsEl.appendChild(sectionEl);
     }
 
     // Tracks section
     if (filteredTracks.length > 0) {
-      html += `<div class="search-section">
-        <div class="search-section-header">🎵 Tracks (${filteredTracks.length})</div>`;
+      const sectionEl = document.createElement('div');
+      sectionEl.className = 'search-section';
+
+      const headerEl = document.createElement('div');
+      headerEl.className = 'search-section-header';
+      headerEl.textContent = `🎵 Tracks (${filteredTracks.length})`;
+      sectionEl.appendChild(headerEl);
 
       // Group tracks by album for display
       const trackIndex = new Map();
@@ -368,109 +489,29 @@ class PlaylistView extends HTMLElement {
       Object.keys(albumTracks).forEach(album => {
         albumTracks[album].forEach(track => {
           const idx = trackIndex.get(track);
-          const isActive = this.currentIndex === idx ? ' active' : '';
           const trackNum = parseTrackNumber(track.track);
           const trackNumStr = trackNum ? String(trackNum).padStart(2, '0') : '--';
           const trackTitle = track.title || track.file.name.replace(/\.[^/.]+$/, '');
 
-          html += `<div class="search-result-item track-result${isActive}" data-index="${idx}">
-            <span class="search-result-main">
-              <span class="search-result-title">${trackNumStr}. ${this.escapeHtml(trackTitle)}</span>
-              <span class="search-result-subtitle">${this.escapeHtml(track.artist)} • ${this.escapeHtml(track.album)}</span>
-            </span>
-          </div>`;
+          const itemEl = resultTemplate.content.cloneNode(true);
+          const resultDiv = itemEl.querySelector('.search-result-item');
+          resultDiv.className = 'search-result-item track-result';
+          resultDiv.dataset.index = idx;
+          if (this.currentIndex === idx) {
+            resultDiv.classList.add('active');
+          }
+          itemEl.querySelector('.search-result-title').textContent = `${trackNumStr}. ${trackTitle}`;
+          itemEl.querySelector('.search-result-subtitle').textContent = `${track.artist} • ${track.album}`;
+          sectionEl.appendChild(itemEl);
         });
       });
+
+      sectionsEl.appendChild(sectionEl);
     }
 
-    html += '</div>';
-    playlistEl.innerHTML = html;
-    this.setupPlaylistItemListeners();
+    playlistEl.appendChild(sectionsEl);
   }
 
-  /**
-   * Set up event listeners for playlist items (click to select track)
-   */
-  setupPlaylistItemListeners() {
-    const playlistEl = this.querySelector('.playlist');
-    if (!playlistEl) return;
-
-    // Track selection listeners
-    const items = playlistEl.querySelectorAll('[data-index]');
-    items.forEach(item => {
-      item.addEventListener('click', (e) => {
-        // Don't trigger on button clicks
-        if (e.target.classList.contains('add-playlist-btn') || e.target.classList.contains('delete-track-btn')) {
-          return;
-        }
-
-        const index = parseInt(item.dataset.index, 10);
-        this.dispatchEvent(new CustomEvent('track-selected', {
-          detail: { index },
-          bubbles: true,
-          composed: true
-        }));
-      });
-    });
-
-    // Search result listeners (artist/album selection)
-    const artistResults = playlistEl.querySelectorAll('[data-artist]');
-    artistResults.forEach(result => {
-      result.addEventListener('click', () => {
-        const artist = result.dataset.artist;
-        this.searchSelectedArtist = this.searchSelectedArtist === artist ? null : artist;
-        this.renderPlaylist();
-      });
-    });
-
-    const albumResults = playlistEl.querySelectorAll('[data-album]');
-    albumResults.forEach(result => {
-      result.addEventListener('click', () => {
-        const album = result.dataset.album;
-        this.searchSelectedAlbum = this.searchSelectedAlbum === album ? null : album;
-        this.renderPlaylist();
-      });
-    });
-
-    // Add-to-playlist button listeners
-    const addBtns = playlistEl.querySelectorAll('.add-playlist-btn');
-    addBtns.forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Get the track index from the parent item's data-index attribute
-        const item = btn.closest('[data-index]');
-        if (item) {
-          const index = parseInt(item.dataset.index, 10);
-          const track = this.tracks[index];
-          if (track) {
-            this.dispatchEvent(new CustomEvent('add-track-to-playlist', {
-              detail: { track },
-              bubbles: true,
-              composed: true
-            }));
-          }
-        }
-      });
-    });
-
-    // Delete button listeners
-    const deleteBtns = playlistEl.querySelectorAll('.delete-track-btn');
-    deleteBtns.forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Get the track index from the parent item's data-index attribute
-        const item = btn.closest('[data-index]');
-        if (item) {
-          const index = parseInt(item.dataset.index, 10);
-          this.dispatchEvent(new CustomEvent('delete-track', {
-            detail: { index },
-            bubbles: true,
-            composed: true
-          }));
-        }
-      });
-    });
-  }
 
   /**
    * Scroll the currently playing track into view

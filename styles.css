@@ -441,7 +441,7 @@ playlist-view {
 .playlist-view .add-playlist-btn {
   background: transparent;
   border: none;
-  color: #888;
+  color: #4a9eff;
   cursor: pointer;
   font-size: 1.2rem;
   padding: 0.25rem 0.5rem;
@@ -451,7 +451,7 @@ playlist-view {
 }
 
 .playlist-view .add-playlist-btn:hover {
-  color: #4a9eff;
+  color: #5aafff;
 }
 
 .playlist-view .playlist-item.unavailable {
@@ -477,19 +477,7 @@ playlist-view {
 }
 
 .playlist-view .delete-track-btn {
-  background: transparent;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 0.25rem 0.5rem;
-  margin-left: 0.25rem;
-  transition: color 0.2s;
-  flex-shrink: 0;
-}
-
-.playlist-view .delete-track-btn:hover {
-  color: #ff6666;
+  display: none;
 }
 
 .playlist-view .search-sections {

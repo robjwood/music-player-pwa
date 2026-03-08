@@ -35,6 +35,18 @@ The app follows a **centralized state + component communication** pattern:
    - `app.js` updates state → calls component methods to reflect changes
    - No two-way binding; explicit control flow
 
+### Web Component Philosophy: Progressive Enhancement
+
+Components follow a **progressive enhancement** model:
+
+1. **HTML is the source of truth** — all static structure is defined in `index.html`. Components never generate static markup with JavaScript.
+2. **Web components are wrappers** — they `querySelector` into their existing HTML, attach event listeners, and mutate state (textContent, classList, attributes). They don't own layout or core structure.
+3. **Dynamic/repeated content uses `<template>`** — when structure must repeat per data item (e.g. per track, per album), the HTML shape is defined once in a `<template>` element in `index.html`. JavaScript clones it and sets only the data (via `textContent`, `classList`, `dataset`).
+4. **No innerHTML with user data** — use `textContent` to set user-provided values (XSS safe). `innerHTML` is reserved for empty-state messages with no user data.
+5. **Event delegation over per-item listeners** — attach one listener to a container in `connectedCallback()` rather than re-attaching per render. This scales better and simplifies cleanup.
+
+**Example**: `playlist-view.js` renders album headers and track items by cloning `#album-header-template` and `#playlist-item-template` from `index.html`, then populates them with data. All click events (track selection, add-to-playlist, delete) are handled by a single delegated listener on `.playlist` instead of attaching listeners per item.
+
 ### File Structure
 
 ```

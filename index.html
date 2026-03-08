@@ -40,6 +40,32 @@
         </div>
         <div class="playlist"></div>
       </playlist-view>
+
+      <!-- Templates for playlist-view (data-driven HTML structure) -->
+      <template id="album-header-template">
+        <div class="album-header">
+          <div class="album-header-name"></div>
+          <div class="album-header-duration"></div>
+        </div>
+      </template>
+
+      <template id="playlist-item-template">
+        <div class="playlist-item" data-index="">
+          <span class="track-label"></span>
+          <span class="track-meta"></span>
+          <button class="add-playlist-btn" title="Add to playlist">+</button>
+          <button class="delete-track-btn" title="Delete from playlist">✕</button>
+        </div>
+      </template>
+
+      <template id="search-result-item-template">
+        <div class="search-result-item">
+          <span class="search-result-main">
+            <span class="search-result-title"></span>
+            <span class="search-result-subtitle"></span>
+          </span>
+        </div>
+      </template>
     </main>
 
     <!-- Player Controls (Bottom) -->
