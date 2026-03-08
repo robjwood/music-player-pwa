@@ -269,6 +269,13 @@ class PlaylistView extends HTMLElement {
     this.fullLibrary = fullLibrary || tracks;  // Use provided full library, or fall back to current tracks
     this.playlistId = playlistId;
 
+    // Toggle playlist mode class for delete button visibility
+    if (playlistId) {
+      this.classList.add('playlist-mode');
+    } else {
+      this.classList.remove('playlist-mode');
+    }
+
     if (clearSearch) {
       this.searchQuery = '';
       this.searchSelectedArtist = null;

@@ -583,8 +583,8 @@ function showPlaylistModal(isMultiple = false) {
             const div = document.createElement('div');
             div.className = 'playlist-option';
             div.textContent = `${p.name} (${p.tracks.length})`;
-            div.addEventListener('click', () => {
-                addTrackToPlaylist(p.id);
+            div.addEventListener('click', async () => {
+                await addTrackToPlaylist(p.id);
                 modal.close();
             });
             playlistList.appendChild(div);
@@ -615,6 +615,35 @@ async function addTrackToPlaylist(playlistId) {
         playerState.pendingTracks = null;
         // Reload playlists in sidebar
         await loadAndSetPlaylists();
+
+        // If currently viewing a playlist, refresh it to reflect changes
+        if (playerState.currentPlaylistId) {
+            const currentPlaylist = await MusicPlayerDB.getPlaylist(playerState.currentPlaylistId);
+            if (currentPlaylist) {
+                const updatedTracks = currentPlaylist.tracks.map(pt => {
+                    const libraryTrack = playerState.library.find(t => t.file.name === pt.fileName);
+                    if (libraryTrack) {
+                        return libraryTrack;
+                    }
+                    return {
+                        file: { name: pt.fileName },
+                        title: pt.title,
+                        artist: pt.artist,
+                        album: pt.album,
+                        track: pt.track,
+                        year: pt.year,
+                        duration: pt.duration,
+                        unavailable: true,
+                    };
+                });
+
+                playerState.displayedTracks = updatedTracks;
+                playerState.playlist = updatedTracks.map(t => t.file);
+                playerState.currentIndex = -1;
+                DOM.playlistView.setTracks(updatedTracks, playerState.currentPlaylistId, true, playerState.sortedLibrary);
+                DOM.fileSelector.updateFileCount(playerState.playlist.length);
+            }
+        }
     } catch (err) {
         console.warn('Failed to add track(s) to playlist:', err);
         alert('Error adding track(s) to playlist');
@@ -651,7 +680,12 @@ async function handleDeleteTrackFromPlaylist(event) {
         return;
     }
 
-    const track = event.detail.track;
+    const index = event.detail.index;
+    const track = playerState.displayedTracks[index];
+    if (!track) {
+        console.warn('Track not found at index', index);
+        return;
+    }
 
     try {
         await MusicPlayerDB.removeTrackFromPlaylist(playerState.currentPlaylistId, track.file.name);
