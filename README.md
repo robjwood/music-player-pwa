@@ -2,6 +2,8 @@
 
 A lightweight, vanilla JavaScript music player PWA inspired by [CMUS](https://cmus.github.io/). Built with HTML, CSS, and JavaScript—no frameworks, no npm required.
 
+**A work in progress and a learning project so use at your own risk!** 
+
 ## Features
 
 ### Current (Phase 1)
